@@ -1,0 +1,33 @@
+# macOS / editor noise
+.DS_Store
+*.swp
+*.swo
+
+# Build output
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.xcodeproj/
+*.xcworkspace/
+*.app/
+
+# Local JUCE checkout.
+# Either clone JUCE into ./JUCE locally, install JUCE so CMake can find it,
+# or configure with -DDJXYPAD_FETCH_JUCE=ON.
+JUCE/
+_deps/
+
+# Local audio test material. Keep copyrighted/music files out of git.
+*.m4a
+*.mp3
+*.wav
+*.aiff
+*.aif
+*.flac
+
+# Runtime logs / local captures
+*.log
+progress/
