@@ -1,6 +1,6 @@
-# DJ XY Pad
+# XY_FX_Pad
 
-DJ XY Pad is a JUCE-based desktop FX pad for experimenting with mouse-controlled and physical-controller-driven DJ effects.
+XY_FX_Pad is a JUCE-based desktop FX pad for experimenting with mouse-controlled and physical-controller-driven DJ effects. The built macOS app is currently named `DJ XY Pad`.
 
 The app lets you assign one effect to the X axis and another effect to the Y axis. Effects are applied only while the pad is pressed, making it useful for momentary Kaoss Pad style gestures.
 
