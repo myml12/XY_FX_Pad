@@ -48,7 +48,7 @@ target_sources(DJXYPad PRIVATE
 target_compile_definitions(DJXYPad PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    SOURCE_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    SOURCE_AUDIO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/audio"
 )
 
 target_link_libraries(DJXYPad PRIVATE
@@ -58,10 +58,10 @@ target_link_libraries(DJXYPad PRIVATE
 )
 
 file(GLOB DJXYPAD_AUDIO_FILES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.m4a"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.mp3"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.wav"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.aiff"
+    "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.m4a"
+    "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.mp3"
+    "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.wav"
+    "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.aiff"
 )
 
 if (DJXYPAD_AUDIO_FILES)

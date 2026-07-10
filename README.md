@@ -89,13 +89,14 @@ build/ControllerBridge
 
 ## 音源ファイル
 
-プロジェクトルートに配置した音源ファイルをアプリ内で選択可能。
+`audio/` に配置した音源ファイルをアプリ内で選択可能。音源本体は `.gitignore` 対象で、リポジトリには含まれない。
 
 ```text
-*.m4a
-*.mp3
-*.wav
-*.aiff
+audio/
+├── *.m4a
+├── *.mp3
+├── *.wav
+└── *.aiff
 ```
 
 ## ディレクトリ構成
@@ -103,6 +104,7 @@ build/ControllerBridge
 ```text
 .
 ├── CMakeLists.txt
+├── audio/
 ├── Source/
 │   ├── Main.cpp
 │   ├── MainComponent.h/.cpp

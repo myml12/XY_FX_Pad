@@ -18,7 +18,7 @@ Makefile
 JUCE/
 _deps/
 
-# ローカル音源
+# ローカル音源（audio/ 配下に配置）
 *.m4a
 *.mp3
 *.wav
