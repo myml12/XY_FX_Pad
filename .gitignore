@@ -1,9 +1,9 @@
-# macOS / editor noise
+# macOS / エディタ由来の不要ファイル
 .DS_Store
 *.swp
 *.swo
 
-# Build output
+# ビルド生成物
 build/
 cmake-build-*/
 CMakeFiles/
@@ -14,13 +14,13 @@ Makefile
 *.xcworkspace/
 *.app/
 
-# Local JUCE checkout.
-# Either clone JUCE into ./JUCE locally, install JUCE so CMake can find it,
-# or configure with -DDJXYPAD_FETCH_JUCE=ON.
+# ローカルのJUCE checkout
+# ./JUCE にcloneするか、CMakeが見つけられる場所にJUCEをインストールするか、
+# -DDJXYPAD_FETCH_JUCE=ON を指定してください。
 JUCE/
 _deps/
 
-# Local audio test material. Keep copyrighted/music files out of git.
+# ローカルの音源テスト素材。著作権のある音源をgitに含めないため除外します。
 *.m4a
 *.mp3
 *.wav
@@ -28,6 +28,6 @@ _deps/
 *.aif
 *.flac
 
-# Runtime logs / local captures
+# 実行ログ / ローカルキャプチャ
 *.log
 progress/

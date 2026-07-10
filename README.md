@@ -1,24 +1,24 @@
 # XY_FX_Pad
 
-XY_FX_Pad is a JUCE-based desktop FX pad for experimenting with mouse-controlled and physical-controller-driven DJ effects. The built macOS app is currently named `DJ XY Pad`.
+XY_FX_Pad は、マウス操作と物理コントローラー操作の両方でDJ向けエフェクトを実験するための、JUCE製デスクトップFXパッドです。ビルドされるmacOSアプリ名は現在 `DJ XY Pad` です。
 
-The app lets you assign one effect to the X axis and another effect to the Y axis. Effects are applied only while the pad is pressed, making it useful for momentary Kaoss Pad style gestures.
+X軸とY軸にそれぞれ別のエフェクトを割り当てられます。パッドを押している間だけエフェクトが有効になるため、Kaoss Padのようなモーメンタリー操作を試せます。
 
-## Features
+## 主な機能
 
-- Mouse-draggable square XY pad
-- Separate effect assignment for X and Y axes
-- File playback from audio files placed in the project directory
-- External input mode for live audio processing
-- Playback position display and seeking
-- Play/Pause button plus space-key transport toggle
-- Nightcore mode that raises pitch and tempo together
-- Lightweight BPM estimation for tempo-synced `Gate`, `Echo`, and `Roll`
-- Separate serial-to-UDP bridge for the physical 4-point pressure controller
+- マウスでドラッグできる正方形XYパッド
+- X軸とY軸への個別エフェクト割り当て
+- プロジェクトディレクトリ内の音源ファイル再生
+- 外部入力音声を処理するInputモード
+- 再生位置の表示とシーク
+- `Play` / `Pause` ボタンとスペースキーによる再生停止
+- ピッチとテンポを同時に上げるNightcoreモード
+- `Gate`, `Echo`, `Roll` 向けの軽量BPM推定
+- 4点圧力式物理コントローラー用のシリアル-UDPブリッジ
 
-## Effects
+## エフェクト
 
-Available effects:
+利用できるエフェクトは以下です。
 
 - `Gate`
 - `Echo`
@@ -35,24 +35,24 @@ Available effects:
 - `BitCrusher`
 - `Roll`
 
-See [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) for DSP mappings and tempo-analysis details.
+DSPの割り当てやBPM解析の詳細は [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md) を参照してください。
 
-## Requirements
+## 必要環境
 
-- macOS, currently tested locally on Apple Clang/CMake
-- CMake 3.22+
-- C++17 compiler
+- macOS（ローカルではApple Clang/CMakeで確認）
+- CMake 3.22以上
+- C++17対応コンパイラ
 - JUCE
 
-JUCE is intentionally not vendored in this repository. Use one of these approaches:
+JUCEはこのリポジトリには含めません。以下のいずれかの方法で用意してください。
 
-- Clone JUCE into `./JUCE`
-- Install JUCE so `find_package(JUCE CONFIG)` can locate it
-- Configure with `-DDJXYPAD_FETCH_JUCE=ON` in a network-enabled environment
+- `./JUCE` にJUCEをcloneする
+- `find_package(JUCE CONFIG)` で見つかるようにJUCEをインストールする
+- ネットワークが使える環境で `-DDJXYPAD_FETCH_JUCE=ON` を指定する
 
-## Build
+## ビルド
 
-With a local JUCE checkout at `./JUCE`:
+`./JUCE` にJUCE cloneがある場合:
 
 ```sh
 cmake -S . -B build
@@ -60,7 +60,7 @@ cmake --build build
 open build/DJXYPad_artefacts/DJ\ XY\ Pad.app
 ```
 
-With CMake fetching JUCE:
+CMakeでJUCEを取得する場合:
 
 ```sh
 cmake -S . -B build -DDJXYPAD_FETCH_JUCE=ON
@@ -68,9 +68,9 @@ cmake --build build
 open build/DJXYPad_artefacts/DJ\ XY\ Pad.app
 ```
 
-## Audio Files
+## 音源ファイル
 
-Put local test audio files in the project root before building:
+ビルド前に、ローカルのテスト用音源をプロジェクトルートに置いてください。
 
 ```text
 *.m4a
@@ -79,21 +79,21 @@ Put local test audio files in the project root before building:
 *.aiff
 ```
 
-The CMake build copies those files into the app bundle resources. Audio files are ignored by git so copyrighted or local-only material is not published accidentally.
+CMakeビルド時に、これらのファイルはapp bundleのResourcesへコピーされます。音源ファイルはgitignoreしているため、著作権のある音源やローカル専用素材を誤って公開しないようになっています。
 
-## Physical Controller
+## 物理コントローラー
 
-The Arduino firmware is in [firmware.ino](firmware.ino). It emits four pressure values at around 80 Hz.
+Arduinoファームウェアは [firmware.ino](firmware.ino) です。約80Hzで4点の圧力値を出力します。
 
-Build the project, then run the bridge separately:
+プロジェクトをビルドしたあと、別ターミナルでブリッジを起動します。
 
 ```sh
 build/ControllerBridge
 ```
 
-The default serial port is `/dev/cu.usbmodem1101`. The bridge converts the four pressure values into normalized XY coordinates and sends them to the app over UDP. See [docs/CONTROLLER.md](docs/CONTROLLER.md) for the protocol and coordinate math.
+デフォルトのシリアルポートは `/dev/cu.usbmodem1101` です。ブリッジは4点の圧力値を正規化XY座標に変換し、UDPでアプリへ送信します。プロトコルと座標計算の詳細は [docs/CONTROLLER.md](docs/CONTROLLER.md) を参照してください。
 
-## Project Structure
+## プロジェクト構成
 
 ```text
 .
@@ -114,6 +114,6 @@ The default serial port is `/dev/cu.usbmodem1101`. The bridge converts the four 
 └── firmware.ino
 ```
 
-## License
+## ライセンス
 
-This project is released under the MIT License. JUCE and any other third-party dependencies remain under their own licenses.
+このプロジェクトはMIT Licenseで公開しています。JUCEおよびその他のサードパーティ依存関係は、それぞれのライセンスに従います。

@@ -1,48 +1,48 @@
-# Physical Controller
+# 物理コントローラー
 
-The physical FX pad is handled by a separate bridge process so serial parsing and center-of-pressure calculation do not block the JUCE message thread.
+物理FXパッドは、JUCEアプリ本体とは別プロセスのブリッジで処理します。これにより、シリアル解析と重心計算がJUCEのMessage Threadを塞がないようにしています。
 
-## Firmware Output
+## ファームウェア出力
 
-`firmware.ino` prints CSV rows at around 80 Hz:
+`firmware.ino` は約80HzでCSV行を出力します。
 
 ```text
 g0,g1,g2,g3
 ```
 
-The four values are pressure/weight readings in this order:
+4つの値は、以下の順序の圧力/重量読み取り値です。
 
-| Field | Corner |
+| フィールド | 角 |
 | --- | --- |
-| `g0` | top-right |
-| `g1` | top-left |
-| `g2` | bottom-left |
-| `g3` | bottom-right |
+| `g0` | 右上 |
+| `g1` | 左上 |
+| `g2` | 左下 |
+| `g3` | 右下 |
 
-## Bridge
+## ブリッジ
 
-Run the bridge in a separate terminal:
+別ターミナルでブリッジを起動します。
 
 ```sh
 build/ControllerBridge
 ```
 
-Default serial settings:
+デフォルトのシリアル設定は以下です。
 
-- Port: `/dev/cu.usbmodem1101`
-- Baud: `115200`
-- Mode: raw, non-blocking read
+- ポート: `/dev/cu.usbmodem1101`
+- ボーレート: `115200`
+- モード: raw、non-blocking read
 
-The bridge prints only the current coordinate or the no-touch state:
+ブリッジは現在座標、または未検出状態だけを表示します。
 
 ```text
 XY 0.523,0.417 total=34.2g
 検出なし total=2.1g
 ```
 
-## Coordinate Calculation
+## 座標計算
 
-Negative readings are clamped to zero. Touch is active when total force is at least 5 g.
+負の読み取り値はゼロに丸めます。合計荷重が5g以上の場合にtouch状態とします。
 
 ```text
 total = max(g0,0) + max(g1,0) + max(g2,0) + max(g3,0)
@@ -50,14 +50,14 @@ x = (topRight + bottomRight) / total
 y = (topLeft + topRight) / total
 ```
 
-The physical field is 3:2, but X and Y are normalized independently and mapped onto the square software pad. The bridge applies a 10% inverse margin correction, expanding the reachable physical range around `0.1..0.9` to the software range `0.0..1.0`.
+物理フィールドは3:2ですが、XとYをそれぞれ独立に正規化し、ソフトウェア側の正方形パッドへ対応させます。ブリッジでは10%の逆マージン補正を行い、物理的に届く `0.1..0.9` 付近の範囲を、ソフトウェア上の `0.0..1.0` へ引き伸ばします。
 
-## App Protocol
+## アプリ側プロトコル
 
-The app does not open the serial port. `ControllerReceiver` listens on `127.0.0.1:45454` for lightweight UDP packets from `ControllerBridge`:
+アプリ本体はシリアルポートを開きません。`ControllerReceiver` が `127.0.0.1:45454` で `ControllerBridge` からの軽量UDPパケットを待ち受けます。
 
 ```text
 x,y,touch,total
 ```
 
-Every 80 Hz sample updates the audio-side pad state. GUI drawing is downsampled to the app's 20 Hz timer and uses only the latest received sample, keeping audio control responsive while avoiding excessive repaint work.
+80Hzの各サンプルは、音声処理側のパッド状態を更新します。GUI描画はアプリ側の20Hz timerへダウンサンプリングされ、最新サンプルだけを反映します。これにより、音声制御の反応は保ちつつ、過剰なrepaintでGUIが詰まることを避けます。
