@@ -14,13 +14,11 @@ Makefile
 *.xcworkspace/
 *.app/
 
-# ローカルのJUCE checkout
-# ./JUCE にcloneするか、CMakeが見つけられる場所にJUCEをインストールするか、
-# -DDJXYPAD_FETCH_JUCE=ON を指定してください。
+# JUCE checkout
 JUCE/
 _deps/
 
-# ローカルの音源テスト素材。著作権のある音源をgitに含めないため除外します。
+# ローカル音源
 *.m4a
 *.mp3
 *.wav
