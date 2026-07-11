@@ -52,6 +52,7 @@ SDVX風の演出には、`SDVX Laser Wobble`、`SDVX FX Gate`、`SDVX Retrigger`
 実演時は、単発の強い誤タッチを避けるため、Bridgeのゼロ点校正をパッド無荷重で終えてから開始してください。UDPが200ms途切れた場合は自動でFXが解除されます。
 
 DSP、BPM解析、音声ルーティングの詳細: [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md)
+エフェクトごとの実際の音声処理と聴こえ方: [docs/EFFECTS.md](docs/EFFECTS.md)
 
 ## ハードウェア構成
 
@@ -163,7 +164,8 @@ audio/
 │   └── install_blackhole.sh
 ├── docs/
 │   ├── TECHNICAL_SPEC.md
-│   └── CONTROLLER.md
+│   ├── CONTROLLER.md
+│   └── EFFECTS.md
 ├── BlackHole/          # 任意: システム音声キャプチャ用（gitignore）
 └── firmware.ino
 ```

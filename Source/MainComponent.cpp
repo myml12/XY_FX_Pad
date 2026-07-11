@@ -132,8 +132,34 @@ MainComponent::MainComponent()
     status.setJustificationType (juce::Justification::centred);
     status.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.78f));
 
+    const auto styleButton = [] (juce::TextButton& button, juce::Colour accent)
+    {
+        button.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff202b45));
+        button.setColour (juce::TextButton::buttonOnColourId, accent);
+        button.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.88f));
+        button.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
+    };
+    styleButton (modeButton, juce::Colour (0xff4f7cff));
+    styleButton (playButton, juce::Colour (0xff28b89b));
+    styleButton (nightcoreButton, juce::Colour (0xffba6cff));
+
+    const auto styleCombo = [] (juce::ComboBox& box)
+    {
+        box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff111a2d));
+        box.setColour (juce::ComboBox::textColourId, juce::Colours::white.withAlpha (0.88f));
+        box.setColour (juce::ComboBox::outlineColourId, juce::Colours::white.withAlpha (0.12f));
+        box.setColour (juce::ComboBox::arrowColourId, juce::Colour (0xff79a7ff));
+    };
+    styleCombo (fileBox);
+    styleCombo (xEffectBox);
+    styleCombo (yEffectBox);
+    styleCombo (pressureEffectBox);
+    styleCombo (performancePresetBox);
+    positionSlider.setColour (juce::Slider::trackColourId, juce::Colour (0xff30476f));
+    positionSlider.setColour (juce::Slider::thumbColourId, juce::Colour (0xff74a3ff));
+
     loadSelectedAudioFile();
-    setSize (640, 740);
+    setSize (700, 780);
     setAudioChannels (0, 2);
     // Track mode is the default: never open BlackHole or leave system output on it.
     applyTrackModeRouting();
@@ -181,6 +207,9 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
     smoothedPadX.setCurrentAndTargetValue (audioPadX.load());
     smoothedPadY.setCurrentAndTargetValue (audioPadY.load());
     smoothedPadPressure.setCurrentAndTargetValue (audioPadPressure.load());
+    effectMix.reset (sampleRate, 0.035);
+    effectMix.setCurrentAndTargetValue (audioEffectsActive.load() ? 1.0f : 0.0f);
+    dryOutputBuffer.setSize (2, samplesPerBlockExpected, false, false, true);
 
     if (readerSource != nullptr && shouldBePlaying.load())
         transport.start();
@@ -213,10 +242,22 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
     const auto selectedXEffect = static_cast<EffectType> (audioXEffect.load());
     const auto selectedYEffect = static_cast<EffectType> (audioYEffect.load());
     const auto selectedPressureEffect = static_cast<EffectType> (audioPressureEffect.load());
+    effectMix.setTargetValue (active ? 1.0f : 0.0f);
+    const auto shouldProcessEffects = active || effectMix.isSmoothing();
 
-    if (active)
+    const auto canCrossfade = shouldProcessEffects
+                           && bufferToFill.buffer != nullptr
+                           && bufferToFill.buffer->getNumChannels() <= dryOutputBuffer.getNumChannels()
+                           && bufferToFill.numSamples <= dryOutputBuffer.getNumSamples();
+
+    if (canCrossfade)
+        for (int channel = 0; channel < bufferToFill.buffer->getNumChannels(); ++channel)
+            dryOutputBuffer.copyFrom (channel, 0, *bufferToFill.buffer, channel,
+                                      bufferToFill.startSample, bufferToFill.numSamples);
+
+    if (shouldProcessEffects)
     {
-        if (shouldResetMomentaryState.exchange (false))
+        if (active && shouldResetMomentaryState.exchange (false))
         {
             xEffectProcessor.resetMomentary();
             yEffectProcessor.resetMomentary();
@@ -237,7 +278,25 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
             pressureEffectProcessor.process (bufferToFill, selectedPressureEffect, pressure, bpm, 1.0f);
     }
 
+    if (canCrossfade)
+        crossfadeEffectsWithDry (bufferToFill);
+
     softLimitOutput (bufferToFill);
+}
+
+void MainComponent::crossfadeEffectsWithDry (const juce::AudioSourceChannelInfo& bufferToFill)
+{
+    for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
+    {
+        const auto wet = effectMix.getNextValue();
+
+        for (int channel = 0; channel < bufferToFill.buffer->getNumChannels(); ++channel)
+        {
+            auto* output = bufferToFill.buffer->getWritePointer (channel, bufferToFill.startSample);
+            const auto* dry = dryOutputBuffer.getReadPointer (channel);
+            output[sample] = dry[sample] * (1.0f - wet) + output[sample] * wet;
+        }
+    }
 }
 
 void MainComponent::softLimitOutput (const juce::AudioSourceChannelInfo& bufferToFill)
@@ -270,7 +329,30 @@ void MainComponent::releaseResources()
 
 void MainComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (juce::Colour (0xff151820));
+    juce::ColourGradient background (juce::Colour (0xff090d17), 0.0f, 0.0f,
+                                     juce::Colour (0xff162543), static_cast<float> (getWidth()),
+                                     static_cast<float> (getHeight()), false);
+    background.addColour (0.48, juce::Colour (0xff0f1728));
+    g.setGradientFill (background);
+    g.fillAll();
+
+    auto content = getLocalBounds().reduced (18).toFloat();
+    content.removeFromTop (52.0f);
+    auto controlsCard = content.removeFromTop (222.0f);
+    g.setColour (juce::Colour (0xff121c31).withAlpha (0.94f));
+    g.fillRoundedRectangle (controlsCard, 16.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.09f));
+    g.drawRoundedRectangle (controlsCard, 16.0f, 1.0f);
+
+    content.removeFromTop (10.0f);
+    auto padCard = content.withTrimmedBottom (42.0f);
+    g.setColour (juce::Colour (0xff0e1729).withAlpha (0.82f));
+    g.fillRoundedRectangle (padCard, 18.0f);
+    g.setColour (juce::Colour (0xff5688ef).withAlpha (0.16f));
+    g.drawRoundedRectangle (padCard, 18.0f, 1.0f);
+
+    g.setColour (juce::Colour (0xff70a5ff));
+    g.fillRoundedRectangle (juce::Rectangle<float> (24.0f, 26.0f, 5.0f, 28.0f), 2.5f);
 }
 
 void MainComponent::resized()

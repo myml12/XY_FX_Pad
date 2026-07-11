@@ -55,6 +55,7 @@ private:
     void applyTrackModeRouting();
     bool applySystemCaptureRouting();
     void restoreDefaultRouting();
+    void crossfadeEffectsWithDry (const juce::AudioSourceChannelInfo& bufferToFill);
     static void softLimitOutput (const juce::AudioSourceChannelInfo& bufferToFill);
     static juce::String formatTime (double seconds);
 
@@ -81,6 +82,7 @@ private:
     juce::AudioFormatManager formatManager;
     juce::AudioTransportSource transport;
     std::unique_ptr<juce::AudioFormatReaderSource> readerSource;
+    juce::AudioBuffer<float> dryOutputBuffer;
     double loadedSourceSampleRate = 0.0;
 
     EffectProcessor xEffectProcessor;
@@ -104,6 +106,7 @@ private:
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPadX;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPadY;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPadPressure;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> effectMix;
     bool applyingPreset = false;
 
     std::atomic<bool> shouldResetMomentaryState { false };
