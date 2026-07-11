@@ -7,7 +7,12 @@ namespace
 {
 float snapNearGlobalTempo (float bpm, float globalBpm)
 {
-    const auto candidates = { globalBpm * 0.5f, globalBpm, globalBpm * 2.0f };
+    // 140 BPMの曲を局所窓だけ70 BPMと読む「半分テンポ」を、DJ用途では
+    // グローバル拍に寄せる。Gate / Echo / Roll の拍グリッドを安定させるため。
+    if (globalBpm >= 90.0f && std::abs (bpm - globalBpm * 0.5f) <= 3.0f)
+        return globalBpm;
+
+    const auto candidates = { globalBpm, globalBpm * 2.0f };
 
     for (const auto candidate : candidates)
         if (std::abs (bpm - candidate) <= 3.0f)
@@ -134,28 +139,54 @@ TempoAnalysis TempoAnalyzer::analyse (const juce::File& file, juce::AudioFormatM
         beginFrame = juce::jlimit (0, static_cast<int> (energy.size()) - 1, beginFrame);
         endFrame = juce::jlimit (beginFrame + 1, static_cast<int> (energy.size()), endFrame);
 
-        float bestBpm = 120.0f;
-        float bestScore = -1.0f;
+        struct Estimate { float bpm; float score; };
 
-        for (float bpm = 70.0f; bpm <= 190.0f; bpm += 0.5f)
+        const auto scoreTempo = [&] (float bpm)
         {
             const auto lag = static_cast<int> (std::round ((60.0f / bpm) * framesPerSecond));
 
             if (lag <= 0 || beginFrame + lag >= endFrame)
-                continue;
+                return 0.0f;
 
-            float score = 0.0f;
+            float correlation = 0.0f;
+            float energyA = 0.0f;
+            float energyB = 0.0f;
+
             for (int i = beginFrame + lag; i < endFrame; ++i)
-                score += energy[static_cast<size_t> (i)] * energy[static_cast<size_t> (i - lag)];
-
-            if (score > bestScore)
             {
-                bestScore = score;
-                bestBpm = bpm;
+                const auto a = energy[static_cast<size_t> (i)];
+                const auto b = energy[static_cast<size_t> (i - lag)];
+                correlation += a * b;
+                energyA += a * a;
+                energyB += b * b;
+            }
+
+            // ラグの長さで比較区間が変わる偏りをなくす正規化自己相関。
+            return correlation / (std::sqrt (energyA * energyB) + 1.0e-9f);
+        };
+
+        Estimate best { 120.0f, -1.0f };
+
+        for (float bpm = 55.0f; bpm <= 210.0f; bpm += 0.5f)
+        {
+            const auto score = scoreTempo (bpm);
+            if (score > best.score)
+            {
+                best = { bpm, score };
             }
         }
 
-        return bestBpm;
+        // 70 BPMと140 BPMの両方が候補なら、DJのテンポ同期FXに自然な
+        // 90〜190 BPM帯を優先する。ただし倍テンポの一致度が十分低ければ
+        // 本当に遅い曲としてそのまま残す。
+        if (best.bpm < 95.0f && best.bpm * 2.0f <= 210.0f)
+        {
+            const auto doubleScore = scoreTempo (best.bpm * 2.0f);
+            if (doubleScore >= best.score * 0.72f)
+                best.bpm *= 2.0f;
+        }
+
+        return std::round (best.bpm * 2.0f) * 0.5f;
     };
 
     result.globalBpm = findBestBpm (0, static_cast<int> (energy.size()));

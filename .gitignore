@@ -18,6 +18,9 @@ Makefile
 JUCE/
 _deps/
 
+# BlackHole driver source (optional local clone)
+BlackHole/
+
 # ローカル音源（audio/ 配下に配置）
 *.m4a
 *.mp3

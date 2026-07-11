@@ -8,7 +8,7 @@ X軸とY軸には独立したエフェクトを割り当てる。パッドを押
 
 - JUCE/C++17によるmacOSデスクトップアプリ
 - X/Y軸それぞれに別エフェクトを割り当てる2軸FXパッド
-- 音源ファイル再生と外部入力処理に対応
+- 音源ファイル再生と、BlackHole経由のシステム音声キャプチャに対応
 - 再生位置表示、シーク、Play/Pause、スペースキー操作
 - BPM推定に基づく `Gate`, `Echo`, `Roll` のテンポ同期
 - ピッチとテンポを同時に上げるNightcoreモード
@@ -33,6 +33,19 @@ X軸とY軸には独立したエフェクトを割り当てる。パッドを押
 | `Drive` | ソフトクリップ系ドライブ |
 | `BitCrusher` | 量子化ビットクラッシュ |
 | `Roll` | テンポ同期ループロール |
+| `Peak EQ` | 筆圧で強くなる周波数強調 |
+| `Ladder` | 筆圧でレゾナンス／ドライブが増すローパス |
+| `Chorus` / `Auto Pan` | 空間的な揺らぎ |
+| `Compressor` | 音量の密度調整 |
+
+## 書道パフォーマンス
+
+`Performance preset` から、文字を書く動きに合わせた3種類の割当を選べます。まずは `Calligraphy — ink accent` を推奨します。X方向で強調する周波数を選び、筆圧でその強さが増すため、筆の太さと音のアクセントが自然に対応します。
+
+- `ink bleed`: 払いでLadderを開き、押し込みでReverbを深くする空間表現。
+- `rhythmic strokes`: 点・止めなどの強い筆圧でBPM同期Gateを強調するリズミカルな表現。
+
+実演時は、単発の強い誤タッチを避けるため、Bridgeのゼロ点校正をパッド無荷重で終えてから開始してください。UDPが200ms途切れた場合は自動でFXが解除されます。
 
 DSP、BPM解析、音声ルーティングの詳細: [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md)
 
@@ -44,7 +57,7 @@ DSP、BPM解析、音声ルーティングの詳細: [docs/TECHNICAL_SPEC.md](do
 - センサー: ロードセル x4
 - ADC: HX711 x4
 - HX711 RATE: 80Hz
-- シリアル出力: `g0,g1,g2,g3` のCSV
+- シリアル出力: `raw0,raw1,raw2,raw3` のCSV（g換算とフィルターはPC側）
 - 座標化: PC側の `ControllerBridge` で重心を計算
 - アプリ連携: `127.0.0.1:45454` のUDPでXY/touchを送信
 
@@ -87,6 +100,34 @@ open build/DJXYPad_artefacts/DJ\ XY\ Pad.app
 build/ControllerBridge
 ```
 
+## システム音声キャプチャ（PC Audio モード）
+
+macOS ではアプリ単体で内部音声を取れないため、仮想オーディオデバイス [BlackHole](https://github.com/ExistentialAudio/BlackHole) を使う。
+
+**ジレンマと解決:** システム出力を BlackHole だけにするとスピーカーから聞こえなくなる。本アプリは `PC Audio` 切替時にシステム出力を自動で BlackHole へ向け、アプリがスピーカーへ通す（FX 付き）。`Track` に戻すとシステム出力も元に戻る。
+
+1. BlackHole を clone（未取得の場合）:
+
+```sh
+git clone https://github.com/ExistentialAudio/BlackHole.git
+```
+
+2. ドライバをビルドしてインストール:
+
+```sh
+chmod +x Tools/install_blackhole.sh
+./Tools/install_blackhole.sh
+```
+
+3. アプリを起動し、`Track` → `PC Audio` に切り替える
+
+   - システム出力: 自動で BlackHole
+   - アプリ入力: BlackHole
+   - アプリ出力: スピーカー / ヘッドホン
+   - パッド押下中だけ FX、離すとドライ通過
+
+`Track` に戻すと入力を閉じ、システム出力を復元する。アプリを強制終了した場合は、システム設定の出力先を手動で戻す。
+
 ## 音源ファイル
 
 `audio/` に配置した音源ファイルをアプリ内で選択可能。音源本体は `.gitignore` 対象で、リポジトリには含まれない。
@@ -114,10 +155,12 @@ audio/
 │   ├── ControllerReceiver.h/.cpp
 │   └── ControllerTypes.h
 ├── Tools/
-│   └── ControllerBridge.cpp
+│   ├── ControllerBridge.cpp
+│   └── install_blackhole.sh
 ├── docs/
 │   ├── TECHNICAL_SPEC.md
 │   └── CONTROLLER.md
+├── BlackHole/          # 任意: システム音声キャプチャ用（gitignore）
 └── firmware.ino
 ```
 

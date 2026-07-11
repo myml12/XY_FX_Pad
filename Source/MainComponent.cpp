@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "SystemAudioRouter.h"
 
 MainComponent::MainComponent()
 {
@@ -10,16 +11,16 @@ MainComponent::MainComponent()
 
     pad.onPadChanged = [this] (float x, float y, bool down)
     {
-        juce::ScopedLock lock (stateLock);
-        padX = x;
-        padY = y;
-        effectsActive = down;
+        audioPadX.store (x);
+        audioPadY.store (y);
+        audioPadPressure.store (down ? 1.0f : 0.0f); // マウスは常にフル筆圧
+        audioEffectsActive.store (down);
 
-        if (down != lastPointerDown)
-        {
-            lastPointerDown = down;
+        if (lastPointerDown.exchange (down) != down)
             shouldResetMomentaryState.store (true);
-        }
+
+        controllerGuiPressure.store (down ? 1.0f : 0.0f);
+        pressureMeter.setLevel (down ? 1.0f : 0.0f);
     };
 
     juce::Component::SafePointer<MainComponent> safeThis (this);
@@ -38,6 +39,7 @@ MainComponent::MainComponent()
     };
 
     addAndMakeVisible (pad);
+    addAndMakeVisible (pressureMeter);
     addAndMakeVisible (title);
     addAndMakeVisible (modeButton);
     addAndMakeVisible (playButton);
@@ -45,6 +47,8 @@ MainComponent::MainComponent()
     addAndMakeVisible (fileBox);
     addAndMakeVisible (xEffectBox);
     addAndMakeVisible (yEffectBox);
+    addAndMakeVisible (pressureEffectBox);
+    addAndMakeVisible (performancePresetBox);
     addAndMakeVisible (positionSlider);
     addAndMakeVisible (bpmLabel);
     addAndMakeVisible (positionLabel);
@@ -54,15 +58,32 @@ MainComponent::MainComponent()
     title.setJustificationType (juce::Justification::centred);
     title.setFont (juce::FontOptions (24.0f, juce::Font::bold));
 
-    modeButton.setButtonText ("File");
+    modeButton.setButtonText ("Track");
     modeButton.onClick = [this]
     {
-        useExternalInput.store (! useExternalInput.load());
+        const auto enteringSystemAudioMode = ! useExternalInput.load();
+
+        if (enteringSystemAudioMode)
+        {
+            if (! applySystemCaptureRouting())
+            {
+                updateStatus();
+                return;
+            }
+
+            useExternalInput.store (true);
+        }
+        else
+        {
+            useExternalInput.store (false);
+            restoreDefaultRouting();
+        }
+
         updateModeButton();
         updateStatus();
     };
 
-    playButton.setButtonText ("Pause");
+    playButton.setButtonText ("Play");
     playButton.onClick = [this] { togglePlayback(); };
 
     nightcoreButton.setButtonText ("Nightcore");
@@ -76,6 +97,8 @@ MainComponent::MainComponent()
     fileBox.addKeyListener (this);
     xEffectBox.addKeyListener (this);
     yEffectBox.addKeyListener (this);
+    pressureEffectBox.addKeyListener (this);
+    performancePresetBox.addKeyListener (this);
     positionSlider.addKeyListener (this);
     pad.addKeyListener (this);
 
@@ -110,11 +133,14 @@ MainComponent::MainComponent()
     status.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.78f));
 
     loadSelectedAudioFile();
-    setSize (600, 700);
-    setAudioChannels (2, 2);
+    setSize (640, 740);
+    setAudioChannels (0, 2);
+    // Track mode is the default: never open BlackHole or leave system output on it.
+    applyTrackModeRouting();
     startTimerHz (20);
     updatePlayButton();
     updateNightcoreButton();
+    updateStatus();
     controllerReceiver.start();
 }
 
@@ -124,6 +150,8 @@ MainComponent::~MainComponent()
     controllerReceiver.stop();
     pad.removeKeyListener (this);
     positionSlider.removeKeyListener (this);
+    performancePresetBox.removeKeyListener (this);
+    pressureEffectBox.removeKeyListener (this);
     yEffectBox.removeKeyListener (this);
     xEffectBox.removeKeyListener (this);
     fileBox.removeKeyListener (this);
@@ -134,6 +162,10 @@ MainComponent::~MainComponent()
     transport.stop();
     transport.setSource (nullptr);
     readerSource.reset();
+
+    if (useExternalInput.load())
+        restoreDefaultRouting();
+
     shutdownAudio();
 }
 
@@ -142,6 +174,13 @@ void MainComponent::prepareToPlay (int samplesPerBlockExpected, double sampleRat
     transport.prepareToPlay (samplesPerBlockExpected, sampleRate);
     xEffectProcessor.prepare (samplesPerBlockExpected, sampleRate);
     yEffectProcessor.prepare (samplesPerBlockExpected, sampleRate);
+    pressureEffectProcessor.prepare (samplesPerBlockExpected, sampleRate);
+    smoothedPadX.reset (sampleRate, 0.025);
+    smoothedPadY.reset (sampleRate, 0.025);
+    smoothedPadPressure.reset (sampleRate, 0.025);
+    smoothedPadX.setCurrentAndTargetValue (audioPadX.load());
+    smoothedPadY.setCurrentAndTargetValue (audioPadY.load());
+    smoothedPadPressure.setCurrentAndTargetValue (audioPadPressure.load());
 
     if (readerSource != nullptr && shouldBePlaying.load())
         transport.start();
@@ -162,33 +201,65 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
 
     xEffectProcessor.writeRollHistory (bufferToFill);
     yEffectProcessor.writeRollHistory (bufferToFill);
+    pressureEffectProcessor.writeRollHistory (bufferToFill);
 
-    bool active;
-    float x;
-    float y;
-    EffectType selectedXEffect;
-    EffectType selectedYEffect;
+    const auto active = audioEffectsActive.load();
+    smoothedPadX.setTargetValue (audioPadX.load());
+    smoothedPadY.setTargetValue (audioPadY.load());
+    smoothedPadPressure.setTargetValue (audioPadPressure.load());
+    const auto x = smoothedPadX.skip (bufferToFill.numSamples);
+    const auto y = smoothedPadY.skip (bufferToFill.numSamples);
+    const auto pressure = smoothedPadPressure.skip (bufferToFill.numSamples);
+    const auto selectedXEffect = static_cast<EffectType> (audioXEffect.load());
+    const auto selectedYEffect = static_cast<EffectType> (audioYEffect.load());
+    const auto selectedPressureEffect = static_cast<EffectType> (audioPressureEffect.load());
+
+    if (active)
     {
-        juce::ScopedLock lock (stateLock);
-        active = effectsActive;
-        x = padX;
-        y = padY;
-        selectedXEffect = xEffect;
-        selectedYEffect = yEffect;
+        if (shouldResetMomentaryState.exchange (false))
+        {
+            xEffectProcessor.resetMomentary();
+            yEffectProcessor.resetMomentary();
+            pressureEffectProcessor.resetMomentary();
+        }
+
+        const auto bpm = getMusicalBpm();
+
+        // X/Y: 位置が amount、荷重が強さ（Peak EQ などの筆圧表現）
+        if (selectedXEffect != EffectType::off)
+            xEffectProcessor.process (bufferToFill, selectedXEffect, x, bpm, pressure);
+
+        if (selectedYEffect != EffectType::off)
+            yEffectProcessor.process (bufferToFill, selectedYEffect, y, bpm, pressure);
+
+        // 荷重専用エフェクト: amount=筆圧。強さパラメータはフルで渡す
+        if (selectedPressureEffect != EffectType::off)
+            pressureEffectProcessor.process (bufferToFill, selectedPressureEffect, pressure, bpm, 1.0f);
     }
 
-    if (! active)
+    softLimitOutput (bufferToFill);
+}
+
+void MainComponent::softLimitOutput (const juce::AudioSourceChannelInfo& bufferToFill)
+{
+    if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0)
         return;
 
-    if (shouldResetMomentaryState.exchange (false))
+    for (int channel = 0; channel < bufferToFill.buffer->getNumChannels(); ++channel)
     {
-        xEffectProcessor.resetMomentary();
-        yEffectProcessor.resetMomentary();
-    }
+        auto* data = bufferToFill.buffer->getWritePointer (channel, bufferToFill.startSample);
 
-    const auto bpm = getMusicalBpm();
-    xEffectProcessor.process (bufferToFill, selectedXEffect, x, bpm);
-    yEffectProcessor.process (bufferToFill, selectedYEffect, y, bpm);
+        for (int sample = 0; sample < bufferToFill.numSamples; ++sample)
+        {
+            const auto value = data[sample];
+            const auto magnitude = std::abs (value);
+
+            // 0.95未満は完全に素通し。超過分だけ滑らかに飽和させるため、
+            // 通常再生の音量や質感を変えずに、複数FXのピークを保護できる。
+            if (magnitude > 0.95f)
+                data[sample] = std::copysign (0.95f + 0.05f * std::tanh ((magnitude - 0.95f) / 0.05f), value);
+        }
+    }
 }
 
 void MainComponent::releaseResources()
@@ -206,12 +277,12 @@ void MainComponent::resized()
 {
     auto area = getLocalBounds().reduced (24);
     auto header = area.removeFromTop (44);
-    modeButton.setBounds (header.removeFromRight (96).reduced (0, 4));
+    modeButton.setBounds (header.removeFromRight (108).reduced (0, 4));
     playButton.setBounds (header.removeFromRight (96).reduced (0, 4));
     nightcoreButton.setBounds (header.removeFromRight (112).reduced (0, 4));
     title.setBounds (header);
 
-    auto controls = area.removeFromTop (130);
+    auto controls = area.removeFromTop (206);
     auto fileRow = controls.removeFromTop (28);
     bpmLabel.setBounds (fileRow.removeFromRight (110));
     fileRow.removeFromRight (8);
@@ -219,11 +290,13 @@ void MainComponent::resized()
 
     controls.removeFromTop (10);
     auto effectRow = controls.removeFromTop (28);
-    auto xArea = effectRow.removeFromLeft (effectRow.getWidth() / 2);
-    xArea.removeFromRight (6);
-    effectRow.removeFromLeft (6);
-    xEffectBox.setBounds (xArea);
-    yEffectBox.setBounds (effectRow);
+    const auto effectW = effectRow.getWidth() / 3;
+    xEffectBox.setBounds (effectRow.removeFromLeft (effectW).reduced (0, 0).withTrimmedRight (4));
+    yEffectBox.setBounds (effectRow.removeFromLeft (effectW).reduced (0, 0).withTrimmedRight (4));
+    pressureEffectBox.setBounds (effectRow);
+
+    controls.removeFromTop (10);
+    performancePresetBox.setBounds (controls.removeFromTop (28));
 
     controls.removeFromTop (10);
     auto positionRow = controls.removeFromTop (28);
@@ -232,15 +305,20 @@ void MainComponent::resized()
     positionSlider.setBounds (positionRow);
     status.setBounds (area.removeFromBottom (38));
 
-    const auto side = juce::jmin (area.getWidth(), area.getHeight() - 20);
-    pad.setBounds (area.withSizeKeepingCentre (side, side));
+    constexpr int meterW = 36;
+    auto padArea = area;
+    pressureMeter.setBounds (padArea.removeFromRight (meterW + 8).withTrimmedLeft (8));
+    const auto side = juce::jmin (padArea.getWidth(), padArea.getHeight() - 20);
+    pad.setBounds (padArea.withSizeKeepingCentre (side, side));
 }
 
 bool MainComponent::keyPressed (const juce::KeyPress& key, juce::Component*)
 {
     if (key == juce::KeyPress::spaceKey)
     {
-        togglePlayback();
+        if (! useExternalInput.load())
+            togglePlayback();
+
         return true;
     }
 
@@ -254,6 +332,7 @@ void MainComponent::setupComboBoxes()
 
     auto addEffects = [] (juce::ComboBox& box)
     {
+        box.addItem (effectName (EffectType::off), static_cast<int> (EffectType::off));
         box.addItem (effectName (EffectType::gate), static_cast<int> (EffectType::gate));
         box.addItem (effectName (EffectType::echo), static_cast<int> (EffectType::echo));
         box.addItem (effectName (EffectType::reverb), static_cast<int> (EffectType::reverb));
@@ -262,38 +341,124 @@ void MainComponent::setupComboBoxes()
         box.addItem (effectName (EffectType::highPass), static_cast<int> (EffectType::highPass));
         box.addItem (effectName (EffectType::bandPass), static_cast<int> (EffectType::bandPass));
         box.addItem (effectName (EffectType::notch), static_cast<int> (EffectType::notch));
+        box.addItem (effectName (EffectType::peakEq), static_cast<int> (EffectType::peakEq));
+        box.addItem (effectName (EffectType::lowShelf), static_cast<int> (EffectType::lowShelf));
+        box.addItem (effectName (EffectType::highShelf), static_cast<int> (EffectType::highShelf));
+        box.addItem (effectName (EffectType::ladder), static_cast<int> (EffectType::ladder));
         box.addItem (effectName (EffectType::flanger), static_cast<int> (EffectType::flanger));
         box.addItem (effectName (EffectType::phaser), static_cast<int> (EffectType::phaser));
+        box.addItem (effectName (EffectType::chorus), static_cast<int> (EffectType::chorus));
         box.addItem (effectName (EffectType::tremolo), static_cast<int> (EffectType::tremolo));
+        box.addItem (effectName (EffectType::autoPan), static_cast<int> (EffectType::autoPan));
         box.addItem (effectName (EffectType::drive), static_cast<int> (EffectType::drive));
         box.addItem (effectName (EffectType::bitCrusher), static_cast<int> (EffectType::bitCrusher));
+        box.addItem (effectName (EffectType::compressor), static_cast<int> (EffectType::compressor));
         box.addItem (effectName (EffectType::roll), static_cast<int> (EffectType::roll));
     };
 
     xEffectBox.setTextWhenNothingSelected ("X Effect");
     yEffectBox.setTextWhenNothingSelected ("Y Effect");
+    pressureEffectBox.setTextWhenNothingSelected ("Pressure Effect");
+    performancePresetBox.setTextWhenNothingSelected ("Performance preset");
     addEffects (xEffectBox);
     addEffects (yEffectBox);
-    xEffectBox.setSelectedId (static_cast<int> (EffectType::filter), juce::dontSendNotification);
-    yEffectBox.setSelectedId (static_cast<int> (EffectType::echo), juce::dontSendNotification);
+    addEffects (pressureEffectBox);
+    xEffectBox.setSelectedId (static_cast<int> (EffectType::peakEq), juce::dontSendNotification);
+    yEffectBox.setSelectedId (static_cast<int> (EffectType::off), juce::dontSendNotification);
+    pressureEffectBox.setSelectedId (static_cast<int> (EffectType::off), juce::dontSendNotification);
+
+    performancePresetBox.addItem ("Custom", 1);
+    performancePresetBox.addItem ("Calligraphy — ink accent", 2);
+    performancePresetBox.addItem ("Calligraphy — ink bleed", 3);
+    performancePresetBox.addItem ("Calligraphy — rhythmic strokes", 4);
+    performancePresetBox.setSelectedId (2, juce::dontSendNotification);
 
     xEffectBox.onChange = [this]
     {
-        juce::ScopedLock lock (stateLock);
         xEffect = static_cast<EffectType> (xEffectBox.getSelectedId());
+        audioXEffect.store (static_cast<int> (xEffect));
         updatePadLabels();
+        markCustomPreset();
         shouldResetMomentaryState.store (true);
     };
 
     yEffectBox.onChange = [this]
     {
-        juce::ScopedLock lock (stateLock);
         yEffect = static_cast<EffectType> (yEffectBox.getSelectedId());
+        audioYEffect.store (static_cast<int> (yEffect));
         updatePadLabels();
+        markCustomPreset();
         shouldResetMomentaryState.store (true);
     };
 
+    pressureEffectBox.onChange = [this]
+    {
+        pressureEffect = static_cast<EffectType> (pressureEffectBox.getSelectedId());
+        audioPressureEffect.store (static_cast<int> (pressureEffect));
+        updatePadLabels();
+        markCustomPreset();
+        shouldResetMomentaryState.store (true);
+    };
+
+    performancePresetBox.onChange = [this]
+    {
+        if (! applyingPreset)
+            applyPerformancePreset (performancePresetBox.getSelectedId());
+    };
+
+    applyPerformancePreset (2);
     updatePadLabels();
+}
+
+void MainComponent::applyPerformancePreset (int presetId)
+{
+    if (presetId == 1)
+        return;
+
+    struct Preset
+    {
+        EffectType x;
+        EffectType y;
+        EffectType pressure;
+    };
+
+    Preset preset { EffectType::peakEq, EffectType::off, EffectType::off };
+
+    switch (presetId)
+    {
+        case 2: // 音程帯を筆圧で強調。文字の輪郭を邪魔しない基準プリセット。
+            preset = { EffectType::peakEq, EffectType::off, EffectType::off };
+            break;
+        case 3: // 払いに合わせてフィルターを開き、荷重で残響を深くする。
+            preset = { EffectType::ladder, EffectType::off, EffectType::reverb };
+            break;
+        case 4: // 筆運びでDJフィルター、強い筆圧で拍に沿ったゲートを加える。
+            preset = { EffectType::filter, EffectType::off, EffectType::gate };
+            break;
+        default:
+            return;
+    }
+
+    applyingPreset = true;
+    xEffect = preset.x;
+    yEffect = preset.y;
+    pressureEffect = preset.pressure;
+    xEffectBox.setSelectedId (static_cast<int> (preset.x), juce::dontSendNotification);
+    yEffectBox.setSelectedId (static_cast<int> (preset.y), juce::dontSendNotification);
+    pressureEffectBox.setSelectedId (static_cast<int> (preset.pressure), juce::dontSendNotification);
+    performancePresetBox.setSelectedId (presetId, juce::dontSendNotification);
+    audioXEffect.store (static_cast<int> (preset.x));
+    audioYEffect.store (static_cast<int> (preset.y));
+    audioPressureEffect.store (static_cast<int> (preset.pressure));
+    applyingPreset = false;
+    shouldResetMomentaryState.store (true);
+    updatePadLabels();
+}
+
+void MainComponent::markCustomPreset()
+{
+    if (! applyingPreset)
+        performancePresetBox.setSelectedId (1, juce::dontSendNotification);
 }
 
 void MainComponent::refreshAudioFiles()
@@ -328,6 +493,7 @@ void MainComponent::refreshAudioFiles()
 
 void MainComponent::loadSelectedAudioFile()
 {
+    systemCaptureStatus.clear();
     const auto index = fileBox.getSelectedId() - 1;
 
     if (! juce::isPositiveAndBelow (index, audioFiles.size()))
@@ -423,7 +589,7 @@ void MainComponent::timerCallback()
 
 void MainComponent::updateModeButton()
 {
-    modeButton.setButtonText (useExternalInput.load() ? "Input" : "File");
+    modeButton.setButtonText (useExternalInput.load() ? "PC Audio" : "Track");
 
     if (useExternalInput.load())
         transport.stop();
@@ -437,7 +603,9 @@ void MainComponent::updateModeButton()
 
 void MainComponent::updatePadLabels()
 {
-    pad.setAxisLabels ("X: " + effectName (xEffect), "Y: " + effectName (yEffect));
+    pad.setAxisLabels ("X: " + effectName (xEffect)
+                           + "  |  P: " + effectName (pressureEffect),
+                       "Y: " + effectName (yEffect));
 }
 
 void MainComponent::updateBpmLabel()
@@ -478,6 +646,8 @@ void MainComponent::updateNightcoreButton()
 
 void MainComponent::updateControllerPadDisplay()
 {
+    pressureMeter.setLevel (controllerGuiPressure.load());
+
     if (! controllerGuiDirty.exchange (false))
         return;
 
@@ -491,9 +661,16 @@ void MainComponent::updateStatus()
 {
     const auto suffix = controllerStatus.isNotEmpty() ? (" | " + controllerStatus) : "";
 
+    if (systemCaptureStatus.isNotEmpty())
+    {
+        status.setText (systemCaptureStatus + suffix, juce::dontSendNotification);
+        return;
+    }
+
     if (useExternalInput.load())
     {
-        status.setText ("External input -> output. Hold the pad to apply effects." + suffix, juce::dontSendNotification);
+        status.setText ("Capturing PC audio. Hold pad for FX, release for dry." + suffix,
+                        juce::dontSendNotification);
         return;
     }
 
@@ -505,25 +682,24 @@ void MainComponent::updateStatus()
 
 void MainComponent::handleControllerSample (const ControllerSample& sample)
 {
-    bool resetMomentary = false;
-    {
-        juce::ScopedLock lock (stateLock);
-        padX = sample.x;
-        padY = sample.y;
-        effectsActive = sample.touching;
+    // タッチ閾値〜しっかり押した荷重を 0..1 の筆圧に正規化
+    constexpr float pressureMinGrams = 5.0f;
+    constexpr float pressureMaxGrams = 120.0f;
+    const auto normalisedPressure = juce::jlimit (
+        0.0f, 1.0f,
+        (sample.totalGrams - pressureMinGrams) / (pressureMaxGrams - pressureMinGrams));
 
-        if (sample.touching != lastPointerDown)
-        {
-            lastPointerDown = sample.touching;
-            resetMomentary = true;
-        }
-    }
+    audioPadX.store (sample.x);
+    audioPadY.store (sample.y);
+    audioPadPressure.store (sample.touching ? normalisedPressure : 0.0f);
+    audioEffectsActive.store (sample.touching);
 
-    if (resetMomentary)
+    if (lastPointerDown.exchange (sample.touching) != sample.touching)
         shouldResetMomentaryState.store (true);
 
     controllerGuiX.store (sample.x);
     controllerGuiY.store (sample.y);
+    controllerGuiPressure.store (sample.touching ? normalisedPressure : 0.0f);
     controllerGuiTouching.store (sample.touching);
     controllerGuiDirty.store (true);
 }
@@ -596,6 +772,150 @@ double MainComponent::getPlaybackRateMultiplier() const
 float MainComponent::getMusicalBpm() const
 {
     return juce::jlimit (70.0f, 230.0f, currentBpm.load() * static_cast<float> (getPlaybackRateMultiplier()));
+}
+
+juce::String MainComponent::findBlackHoleInputName()
+{
+    const auto& types = deviceManager.getAvailableDeviceTypes();
+
+    for (auto* type : types)
+    {
+        if (type == nullptr)
+            continue;
+
+        type->scanForDevices();
+
+        for (const auto& name : type->getDeviceNames (true))
+            if (name.containsIgnoreCase ("BlackHole"))
+                return name;
+    }
+
+    return {};
+}
+
+juce::String MainComponent::findPlaybackOutputName()
+{
+    const auto preferred = SystemAudioRouter::findPreferredPlaybackOutputName();
+
+    if (preferred.isNotEmpty() && ! preferred.containsIgnoreCase ("BlackHole"))
+        return preferred;
+
+    juce::StringArray candidates;
+    const auto& types = deviceManager.getAvailableDeviceTypes();
+
+    for (auto* type : types)
+    {
+        if (type == nullptr)
+            continue;
+
+        type->scanForDevices();
+        candidates = type->getDeviceNames (false);
+
+        if (! candidates.isEmpty())
+            break;
+    }
+
+    for (const auto& name : candidates)
+        if (! name.containsIgnoreCase ("BlackHole"))
+            return name;
+
+    return {};
+}
+
+void MainComponent::applyTrackModeRouting()
+{
+    juce::String routeError;
+    SystemAudioRouter::ensureSystemOutputAvoidsBlackHole (routeError);
+
+    juce::AudioDeviceManager::AudioDeviceSetup setup;
+    deviceManager.getAudioDeviceSetup (setup);
+
+    setup.inputDeviceName.clear();
+    setup.inputChannels.clear();
+    setup.useDefaultInputChannels = false;
+
+    const auto playbackOutput = findPlaybackOutputName();
+
+    if (playbackOutput.isNotEmpty())
+        setup.outputDeviceName = playbackOutput;
+
+    setup.useDefaultOutputChannels = true;
+    setup.outputChannels.clear();
+    setup.outputChannels.setRange (0, 2, true);
+
+    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+
+    if (routeError.isNotEmpty())
+        systemCaptureStatus = routeError;
+    else if (error.isNotEmpty())
+        systemCaptureStatus = "Failed to open playback device: " + error;
+    else
+        systemCaptureStatus.clear();
+}
+
+bool MainComponent::applySystemCaptureRouting()
+{
+    const auto blackHole = findBlackHoleInputName();
+
+    if (blackHole.isEmpty())
+    {
+        systemCaptureStatus = "BlackHole not found. Run Tools/install_blackhole.sh first.";
+        return false;
+    }
+
+    const auto playbackOutput = findPlaybackOutputName();
+
+    if (playbackOutput.isEmpty())
+    {
+        systemCaptureStatus = "No speaker/headphone output device found.";
+        return false;
+    }
+
+    juce::AudioDeviceManager::AudioDeviceSetup setup;
+    deviceManager.getAudioDeviceSetup (setup);
+    setup.inputDeviceName = blackHole;
+    setup.outputDeviceName = playbackOutput;
+    setup.useDefaultInputChannels = true;
+    setup.useDefaultOutputChannels = true;
+    setup.inputChannels.clear();
+    setup.inputChannels.setRange (0, 2, true);
+    setup.outputChannels.clear();
+    setup.outputChannels.setRange (0, 2, true);
+
+    const auto error = deviceManager.setAudioDeviceSetup (setup, true);
+
+    if (error.isNotEmpty())
+    {
+        systemCaptureStatus = "Failed to open BlackHole: " + error;
+        return false;
+    }
+
+    juce::String routeError;
+
+    if (! SystemAudioRouter::routeSystemOutputToBlackHole (routeError))
+    {
+        restoreDefaultRouting();
+        systemCaptureStatus = routeError;
+        return false;
+    }
+
+    systemCaptureStatus = "PC Audio: system -> BlackHole -> this app -> " + playbackOutput
+                          + ". Hold pad for FX.";
+    return true;
+}
+
+void MainComponent::restoreDefaultRouting()
+{
+    juce::String routeError;
+    SystemAudioRouter::restoreSystemOutput (routeError);
+
+    if (routeError.isNotEmpty())
+        SystemAudioRouter::ensureSystemOutputAvoidsBlackHole (routeError);
+
+    applyTrackModeRouting();
+
+    if (routeError.isNotEmpty() && systemCaptureStatus.isEmpty())
+        systemCaptureStatus = routeError;
 }
 
 juce::String MainComponent::formatTime (double seconds)

@@ -2,6 +2,7 @@
 
 #include "ControllerReceiver.h"
 #include "Effects.h"
+#include "PressureMeter.h"
 #include "Tempo.h"
 #include "XYPad.h"
 
@@ -39,6 +40,8 @@ private:
     void updateNightcoreButton();
     void updateControllerPadDisplay();
     void updateStatus();
+    void applyPerformancePreset (int presetId);
+    void markCustomPreset();
     void handleControllerSample (const ControllerSample& sample);
     void setControllerStatus (juce::String message);
     void togglePlayback();
@@ -47,9 +50,16 @@ private:
     void setPlaybackWanted (bool shouldPlay);
     double getPlaybackRateMultiplier() const;
     float getMusicalBpm() const;
+    juce::String findBlackHoleInputName();
+    juce::String findPlaybackOutputName();
+    void applyTrackModeRouting();
+    bool applySystemCaptureRouting();
+    void restoreDefaultRouting();
+    static void softLimitOutput (const juce::AudioSourceChannelInfo& bufferToFill);
     static juce::String formatTime (double seconds);
 
     XYPad pad;
+    PressureMeter pressureMeter;
     juce::Label title;
     juce::TextButton modeButton;
     juce::TextButton playButton;
@@ -57,6 +67,8 @@ private:
     juce::ComboBox fileBox;
     juce::ComboBox xEffectBox;
     juce::ComboBox yEffectBox;
+    juce::ComboBox pressureEffectBox;
+    juce::ComboBox performancePresetBox;
     juce::Slider positionSlider;
     juce::Label bpmLabel;
     juce::Label positionLabel;
@@ -64,6 +76,7 @@ private:
 
     juce::String loadedFileName;
     juce::String controllerStatus = "Controller: waiting";
+    juce::String systemCaptureStatus;
     juce::Array<juce::File> audioFiles;
     juce::AudioFormatManager formatManager;
     juce::AudioTransportSource transport;
@@ -72,27 +85,38 @@ private:
 
     EffectProcessor xEffectProcessor;
     EffectProcessor yEffectProcessor;
+    EffectProcessor pressureEffectProcessor;
     ControllerReceiver controllerReceiver { 45454 };
     TempoAnalysis tempoAnalysis;
 
-    juce::CriticalSection stateLock;
-    EffectType xEffect = EffectType::filter;
-    EffectType yEffect = EffectType::echo;
-    float padX = 0.5f;
-    float padY = 0.0f;
-    bool effectsActive = false;
-    bool lastPointerDown = false;
+    EffectType xEffect = EffectType::peakEq;
+    EffectType yEffect = EffectType::off;
+    EffectType pressureEffect = EffectType::off;
+    std::atomic<int> audioXEffect { static_cast<int> (EffectType::peakEq) };
+    std::atomic<int> audioYEffect { static_cast<int> (EffectType::off) };
+    std::atomic<int> audioPressureEffect { static_cast<int> (EffectType::off) };
+    std::atomic<float> audioPadX { 0.5f };
+    std::atomic<float> audioPadY { 0.0f };
+    std::atomic<float> audioPadPressure { 0.0f };
+    std::atomic<bool> audioEffectsActive { false };
+    std::atomic<bool> lastPointerDown { false };
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPadX;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPadY;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPadPressure;
+    bool applyingPreset = false;
 
     std::atomic<bool> shouldResetMomentaryState { false };
     std::atomic<bool> useExternalInput { false };
     std::atomic<bool> userIsSeeking { false };
-    std::atomic<bool> shouldBePlaying { true };
+    std::atomic<bool> shouldBePlaying { false };
     std::atomic<bool> nightcoreEnabled { false };
     std::atomic<float> currentBpm { 120.0f };
     float pendingBpm = 120.0f;
     int pendingBpmTicks = 0;
     std::atomic<float> controllerGuiX { 0.5f };
     std::atomic<float> controllerGuiY { 0.0f };
+    std::atomic<float> controllerGuiPressure { 0.0f };
     std::atomic<bool> controllerGuiTouching { false };
     std::atomic<bool> controllerGuiDirty { false };
 };

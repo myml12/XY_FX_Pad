@@ -34,6 +34,8 @@ juce_add_gui_app(DJXYPad
     PRODUCT_NAME "DJ XY Pad"
     COMPANY_NAME "Local"
     BUNDLE_ID "local.dj.xypad"
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "DJ XY Pad needs audio input access to capture system audio via BlackHole and apply effects."
 )
 
 target_sources(DJXYPad PRIVATE
@@ -41,6 +43,7 @@ target_sources(DJXYPad PRIVATE
     Source/Effects.cpp
     Source/Main.cpp
     Source/MainComponent.cpp
+    Source/SystemAudioRouter.cpp
     Source/Tempo.cpp
     Source/XYPad.cpp
 )
@@ -56,6 +59,10 @@ target_link_libraries(DJXYPad PRIVATE
     juce::juce_dsp
     juce::juce_gui_extra
 )
+
+if (APPLE)
+    target_link_libraries(DJXYPad PRIVATE "-framework CoreAudio")
+endif()
 
 file(GLOB DJXYPAD_AUDIO_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/audio/*.m4a"

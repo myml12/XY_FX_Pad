@@ -23,10 +23,12 @@ private:
     void run() override;
     bool openSocket();
     void closeSocket();
-    void handlePacket (const juce::String& packet);
+    bool handlePacket (const juce::String& packet);
+    void publishTouchRelease();
     void publishConnection (bool connected, const juce::String& message);
 
     int udpPort = 45454;
     int socketFd = -1;
+    bool touchActive = false;
     std::atomic<bool> connected { false };
 };

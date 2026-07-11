@@ -7,6 +7,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+namespace
+{
+constexpr auto controllerTimeoutMs = 200;
+}
+
 ControllerReceiver::ControllerReceiver (int port)
     : juce::Thread ("ControllerReceiver"),
       udpPort (port)
@@ -44,15 +49,21 @@ void ControllerReceiver::run()
         publishConnection (true, "Controller UDP listening :" + juce::String (udpPort));
 
         char buffer[256] {};
+        auto lastPacketTime = juce::Time::getMillisecondCounterHiRes();
 
         while (! threadShouldExit())
         {
+            if (touchActive
+                && juce::Time::getMillisecondCounterHiRes() - lastPacketTime > controllerTimeoutMs)
+                publishTouchRelease();
+
             const auto bytes = ::recv (socketFd, buffer, sizeof (buffer) - 1, 0);
 
             if (bytes > 0)
             {
                 buffer[bytes] = '\0';
-                handlePacket (juce::String::fromUTF8 (buffer).trim());
+                if (handlePacket (juce::String::fromUTF8 (buffer).trim()))
+                    lastPacketTime = juce::Time::getMillisecondCounterHiRes();
             }
             else if (bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
             {
@@ -64,6 +75,7 @@ void ControllerReceiver::run()
             }
         }
 
+        publishTouchRelease();
         closeSocket();
         publishConnection (false, "Controller UDP stopped");
     }
@@ -110,21 +122,39 @@ void ControllerReceiver::closeSocket()
     connected.store (false);
 }
 
-void ControllerReceiver::handlePacket (const juce::String& packet)
+bool ControllerReceiver::handlePacket (const juce::String& packet)
 {
     const auto parts = juce::StringArray::fromTokens (packet, ",", "");
 
     if (parts.size() < 4)
-        return;
+        return false;
 
     ControllerSample sample;
     sample.x = juce::jlimit (0.0f, 1.0f, parts[0].getFloatValue());
     sample.y = juce::jlimit (0.0f, 1.0f, parts[1].getFloatValue());
     sample.touching = parts[2].getIntValue() != 0;
     sample.totalGrams = parts[3].getFloatValue();
+    touchActive = sample.touching;
 
     if (onSample != nullptr)
         onSample (sample);
+
+    return true;
+}
+
+void ControllerReceiver::publishTouchRelease()
+{
+    if (! touchActive)
+        return;
+
+    touchActive = false;
+
+    if (onSample != nullptr)
+    {
+        ControllerSample release;
+        release.touching = false;
+        onSample (release);
+    }
 }
 
 void ControllerReceiver::publishConnection (bool isConnected, const juce::String& message)
