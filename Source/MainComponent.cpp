@@ -56,7 +56,8 @@ MainComponent::MainComponent()
 
     title.setText ("DJ XY Pad", juce::dontSendNotification);
     title.setJustificationType (juce::Justification::centred);
-    title.setFont (juce::FontOptions (24.0f, juce::Font::bold));
+    title.setFont (juce::FontOptions (26.0f, juce::Font::bold));
+    title.setColour (juce::Label::textColourId, juce::Colour (0xfff0f2f5));
 
     modeButton.setButtonText ("Track");
     modeButton.onClick = [this]
@@ -134,32 +135,32 @@ MainComponent::MainComponent()
 
     const auto styleButton = [] (juce::TextButton& button, juce::Colour accent)
     {
-        button.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff202b45));
+        button.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff1b1e22));
         button.setColour (juce::TextButton::buttonOnColourId, accent);
         button.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.88f));
         button.setColour (juce::TextButton::textColourOnId, juce::Colours::white);
     };
-    styleButton (modeButton, juce::Colour (0xff4f7cff));
-    styleButton (playButton, juce::Colour (0xff28b89b));
-    styleButton (nightcoreButton, juce::Colour (0xffba6cff));
+    styleButton (modeButton, juce::Colour (0xffc6ef73));
+    styleButton (playButton, juce::Colour (0xffc6ef73));
+    styleButton (nightcoreButton, juce::Colour (0xffc6ef73));
 
     const auto styleCombo = [] (juce::ComboBox& box)
     {
-        box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff111a2d));
-        box.setColour (juce::ComboBox::textColourId, juce::Colours::white.withAlpha (0.88f));
-        box.setColour (juce::ComboBox::outlineColourId, juce::Colours::white.withAlpha (0.12f));
-        box.setColour (juce::ComboBox::arrowColourId, juce::Colour (0xff79a7ff));
+        box.setColour (juce::ComboBox::backgroundColourId, juce::Colour (0xff171a1e));
+        box.setColour (juce::ComboBox::textColourId, juce::Colour (0xffe9ecef));
+        box.setColour (juce::ComboBox::outlineColourId, juce::Colours::white.withAlpha (0.10f));
+        box.setColour (juce::ComboBox::arrowColourId, juce::Colour (0xffc6ef73));
     };
     styleCombo (fileBox);
     styleCombo (xEffectBox);
     styleCombo (yEffectBox);
     styleCombo (pressureEffectBox);
     styleCombo (performancePresetBox);
-    positionSlider.setColour (juce::Slider::trackColourId, juce::Colour (0xff30476f));
-    positionSlider.setColour (juce::Slider::thumbColourId, juce::Colour (0xff74a3ff));
+    positionSlider.setColour (juce::Slider::trackColourId, juce::Colour (0xff3d4448));
+    positionSlider.setColour (juce::Slider::thumbColourId, juce::Colour (0xffc6ef73));
 
     loadSelectedAudioFile();
-    setSize (700, 780);
+    setSize (760, 820);
     setAudioChannels (0, 2);
     // Track mode is the default: never open BlackHole or leave system output on it.
     applyTrackModeRouting();
@@ -329,68 +330,74 @@ void MainComponent::releaseResources()
 
 void MainComponent::paint (juce::Graphics& g)
 {
-    juce::ColourGradient background (juce::Colour (0xff090d17), 0.0f, 0.0f,
-                                     juce::Colour (0xff162543), static_cast<float> (getWidth()),
+    juce::ColourGradient background (juce::Colour (0xff090a0b), 0.0f, 0.0f,
+                                     juce::Colour (0xff151719), static_cast<float> (getWidth()),
                                      static_cast<float> (getHeight()), false);
-    background.addColour (0.48, juce::Colour (0xff0f1728));
+    background.addColour (0.48, juce::Colour (0xff0e1012));
     g.setGradientFill (background);
     g.fillAll();
 
     auto content = getLocalBounds().reduced (18).toFloat();
     content.removeFromTop (52.0f);
     auto controlsCard = content.removeFromTop (222.0f);
-    g.setColour (juce::Colour (0xff121c31).withAlpha (0.94f));
+    g.setColour (juce::Colour (0xff121416).withAlpha (0.96f));
     g.fillRoundedRectangle (controlsCard, 16.0f);
     g.setColour (juce::Colours::white.withAlpha (0.09f));
     g.drawRoundedRectangle (controlsCard, 16.0f, 1.0f);
 
     content.removeFromTop (10.0f);
     auto padCard = content.withTrimmedBottom (42.0f);
-    g.setColour (juce::Colour (0xff0e1729).withAlpha (0.82f));
+    g.setColour (juce::Colour (0xff101214).withAlpha (0.94f));
     g.fillRoundedRectangle (padCard, 18.0f);
-    g.setColour (juce::Colour (0xff5688ef).withAlpha (0.16f));
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
     g.drawRoundedRectangle (padCard, 18.0f, 1.0f);
 
-    g.setColour (juce::Colour (0xff70a5ff));
+    g.setColour (juce::Colour (0xffc6ef73));
     g.fillRoundedRectangle (juce::Rectangle<float> (24.0f, 26.0f, 5.0f, 28.0f), 2.5f);
 }
 
 void MainComponent::resized()
 {
     auto area = getLocalBounds().reduced (24);
-    auto header = area.removeFromTop (44);
-    modeButton.setBounds (header.removeFromRight (108).reduced (0, 4));
-    playButton.setBounds (header.removeFromRight (96).reduced (0, 4));
-    nightcoreButton.setBounds (header.removeFromRight (112).reduced (0, 4));
+    auto header = area.removeFromTop (48);
+    modeButton.setBounds (header.removeFromRight (112).reduced (0, 5));
+    header.removeFromRight (8);
+    playButton.setBounds (header.removeFromRight (96).reduced (0, 5));
+    header.removeFromRight (8);
+    nightcoreButton.setBounds (header.removeFromRight (112).reduced (0, 5));
+    header.removeFromRight (12);
     title.setBounds (header);
 
-    auto controls = area.removeFromTop (206);
-    auto fileRow = controls.removeFromTop (28);
+    auto controls = area.removeFromTop (214);
+    controls.reduce (12, 12);
+    auto fileRow = controls.removeFromTop (32);
     bpmLabel.setBounds (fileRow.removeFromRight (110));
     fileRow.removeFromRight (8);
     fileBox.setBounds (fileRow);
 
-    controls.removeFromTop (10);
-    auto effectRow = controls.removeFromTop (28);
-    const auto effectW = effectRow.getWidth() / 3;
-    xEffectBox.setBounds (effectRow.removeFromLeft (effectW).reduced (0, 0).withTrimmedRight (4));
-    yEffectBox.setBounds (effectRow.removeFromLeft (effectW).reduced (0, 0).withTrimmedRight (4));
+    controls.removeFromTop (12);
+    auto effectRow = controls.removeFromTop (32);
+    const auto effectW = (effectRow.getWidth() - 16) / 3;
+    xEffectBox.setBounds (effectRow.removeFromLeft (effectW));
+    effectRow.removeFromLeft (8);
+    yEffectBox.setBounds (effectRow.removeFromLeft (effectW));
+    effectRow.removeFromLeft (8);
     pressureEffectBox.setBounds (effectRow);
 
-    controls.removeFromTop (10);
-    performancePresetBox.setBounds (controls.removeFromTop (28));
+    controls.removeFromTop (12);
+    performancePresetBox.setBounds (controls.removeFromTop (32));
 
-    controls.removeFromTop (10);
-    auto positionRow = controls.removeFromTop (28);
+    controls.removeFromTop (12);
+    auto positionRow = controls.removeFromTop (30);
     positionLabel.setBounds (positionRow.removeFromRight (140));
     positionRow.removeFromRight (8);
     positionSlider.setBounds (positionRow);
-    status.setBounds (area.removeFromBottom (38));
+    status.setBounds (area.removeFromBottom (34));
 
     constexpr int meterW = 36;
     auto padArea = area;
-    pressureMeter.setBounds (padArea.removeFromRight (meterW + 8).withTrimmedLeft (8));
-    const auto side = juce::jmin (padArea.getWidth(), padArea.getHeight() - 20);
+    pressureMeter.setBounds (padArea.removeFromRight (meterW + 14).withTrimmedLeft (10));
+    const auto side = juce::jmin (padArea.getWidth(), padArea.getHeight() - 18);
     pad.setBounds (padArea.withSizeKeepingCentre (side, side));
 }
 
@@ -823,7 +830,7 @@ void MainComponent::handleControllerSample (const ControllerSample& sample)
 {
     // タッチ閾値〜しっかり押した荷重を 0..1 の筆圧に正規化
     constexpr float pressureMinGrams = 5.0f;
-    constexpr float pressureMaxGrams = 120.0f;
+    constexpr float pressureMaxGrams = 90.0f;
     const auto normalisedPressure = juce::jlimit (
         0.0f, 1.0f,
         (sample.totalGrams - pressureMinGrams) / (pressureMaxGrams - pressureMinGrams));
