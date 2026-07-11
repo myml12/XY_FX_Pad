@@ -52,9 +52,16 @@ XY_FX_Pad は、JUCEのリアルタイム音声処理と、外部物理コント
 
 | プリセット | X | Y | Pressure | 使いどころ |
 | --- | --- | --- | --- | --- |
-| `Calligraphy — ink accent` | Peak EQ | Off | Off | 横移動で強調帯域、筆圧でブースト量。文字の輪郭を保ちやすい基本形。 |
-| `Calligraphy — ink bleed` | Ladder | Off | Reverb | 払いで音色を開き、押し込みで空間を深くする。 |
-| `Calligraphy — rhythmic strokes` | Filter | Off | Gate | 筆運びでDJフィルター、強い止め・点で拍のゲートを強調。 |
+| `Ink Accent` | Peak EQ | Off | Off | 横移動で強調帯域、筆圧でブースト量。文字の輪郭を保ちやすい基本形。 |
+| `Ink Bleed` | Ladder | Off | Reverb | 払いで音色を開き、押し込みで空間を深くする。 |
+| `Rhythm Strokes` | Filter | Off | Gate | 筆運びでDJフィルター、強い止め・点で拍のゲートを強調。 |
+| `Sweep Calligraphy` | Filter | Peak EQ | Off | 横でフィルター、縦で強調帯域をなぞる。音程感のある線向け。 |
+| `Soft Wash` | Low Pass | Off | Reverb | 淡い塗り・にじみのような柔らかい表現。 |
+| `Echo Script` | Peak EQ | Off | Echo | 線の位置で音色、筆圧でBPM同期の残響を作る。 |
+| `Glitch Dots` | BitCrusher | Off | Roll | 点・跳ねをロールやローファイ音として際立たせる。 |
+| `Bass Stroke` | Low Shelf | Ladder | Compressor | 太い横画や力強い漢字向けの低域表現。 |
+| `Bright Stroke` | High Shelf | Phaser | Gate | 明るい払いとリズミカルな止めを強調。 |
+| `Air Brush` | Chorus | Auto Pan | Reverb | 大きな筆運び用の広がりのある実験的な空間表現。 |
 
 ## エフェクト設計
 

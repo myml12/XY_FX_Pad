@@ -40,10 +40,12 @@ X軸とY軸には独立したエフェクトを割り当てる。パッドを押
 
 ## 書道パフォーマンス
 
-`Performance preset` から、文字を書く動きに合わせた3種類の割当を選べます。まずは `Calligraphy — ink accent` を推奨します。X方向で強調する周波数を選び、筆圧でその強さが増すため、筆の太さと音のアクセントが自然に対応します。
+`Performance preset` から、文字を書く動きに合わせた10種類の割当を選べます。名前は表示環境に依存しないASCII表記です。まずは `Ink Accent` を推奨します。X方向で強調する周波数を選び、筆圧でその強さが増すため、筆の太さと音のアクセントが自然に対応します。
 
-- `ink bleed`: 払いでLadderを開き、押し込みでReverbを深くする空間表現。
-- `rhythmic strokes`: 点・止めなどの強い筆圧でBPM同期Gateを強調するリズミカルな表現。
+- `Ink Bleed` / `Soft Wash`: 払いとにじみを空間系へ結び付ける。
+- `Rhythm Strokes` / `Glitch Dots`: 点・止め・跳ねをBPM同期のリズムへ結び付ける。
+- `Sweep Calligraphy` / `Echo Script`: 書く位置そのものを音色・残響の動きにする。
+- `Bass Stroke` / `Bright Stroke` / `Air Brush`: 太さ、明るさ、空間のキャラクターを変える演出用。
 
 実演時は、単発の強い誤タッチを避けるため、Bridgeのゼロ点校正をパッド無荷重で終えてから開始してください。UDPが200ms途切れた場合は自動でFXが解除されます。
 

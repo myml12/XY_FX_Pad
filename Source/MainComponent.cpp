@@ -367,10 +367,19 @@ void MainComponent::setupComboBoxes()
     yEffectBox.setSelectedId (static_cast<int> (EffectType::off), juce::dontSendNotification);
     pressureEffectBox.setSelectedId (static_cast<int> (EffectType::off), juce::dontSendNotification);
 
+    // ComboBox上ではASCIIだけを使う。環境依存フォントで長いダッシュ等が
+    // 文字化けしないようにし、現場で確実に読める名前にする。
     performancePresetBox.addItem ("Custom", 1);
-    performancePresetBox.addItem ("Calligraphy — ink accent", 2);
-    performancePresetBox.addItem ("Calligraphy — ink bleed", 3);
-    performancePresetBox.addItem ("Calligraphy — rhythmic strokes", 4);
+    performancePresetBox.addItem ("Ink Accent", 2);
+    performancePresetBox.addItem ("Ink Bleed", 3);
+    performancePresetBox.addItem ("Rhythm Strokes", 4);
+    performancePresetBox.addItem ("Sweep Calligraphy", 5);
+    performancePresetBox.addItem ("Soft Wash", 6);
+    performancePresetBox.addItem ("Echo Script", 7);
+    performancePresetBox.addItem ("Glitch Dots", 8);
+    performancePresetBox.addItem ("Bass Stroke", 9);
+    performancePresetBox.addItem ("Bright Stroke", 10);
+    performancePresetBox.addItem ("Air Brush", 11);
     performancePresetBox.setSelectedId (2, juce::dontSendNotification);
 
     xEffectBox.onChange = [this]
@@ -434,6 +443,27 @@ void MainComponent::applyPerformancePreset (int presetId)
             break;
         case 4: // 筆運びでDJフィルター、強い筆圧で拍に沿ったゲートを加える。
             preset = { EffectType::filter, EffectType::off, EffectType::gate };
+            break;
+        case 5: // 横方向でフィルター、縦方向でピーク帯域をなぞる。
+            preset = { EffectType::filter, EffectType::peakEq, EffectType::off };
+            break;
+        case 6: // 薄い筆致では原音、押すほどローパスと残響を重ねる。
+            preset = { EffectType::lowPass, EffectType::off, EffectType::reverb };
+            break;
+        case 7: // 線の位置で強調帯域、筆圧でテンポ同期Echoを深くする。
+            preset = { EffectType::peakEq, EffectType::off, EffectType::echo };
+            break;
+        case 8: // 点・跳ねにだけロールを入れる、リズムを強調した表現。
+            preset = { EffectType::bitCrusher, EffectType::off, EffectType::roll };
+            break;
+        case 9: // 太い横画を低域の押し出しとラダーのうねりへ結び付ける。
+            preset = { EffectType::lowShelf, EffectType::ladder, EffectType::compressor };
+            break;
+        case 10: // 縦の払いを高域、強い止めをGateで光らせる。
+            preset = { EffectType::highShelf, EffectType::phaser, EffectType::gate };
+            break;
+        case 11: // 大きな筆運び向けの広がり。空間系を重ねる実験用。
+            preset = { EffectType::chorus, EffectType::autoPan, EffectType::reverb };
             break;
         default:
             return;
