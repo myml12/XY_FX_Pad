@@ -1,153 +1,159 @@
-//==============================
-// HX711設定 (RATEピン → VCC で 80Hz)
-//==============================
-const uint8_t DT_PIN[4] = {D0, D2, D4, D6};
-const uint8_t CLK_PIN[4] = {D1, D3, D5, D7};
+//==================================================
+// HX711 × 4 / XIAO ESP32S3
+// RATEピンをVCCへ接続して80Hz動作
+//
+// 出力形式:
+// raw_ch1,raw_ch2,raw_ch3,raw_ch4
+//
+// マイコン側では以下を行わない:
+// ・ゼロ点キャリブレーション
+// ・g換算
+// ・メジアンフィルター
+// ・移動平均
+// ・スパイク除外
+//==================================================
 
-const uint16_t HX711_SAMPLE_RATE_HZ = 80;
-const uint16_t HX711_SETTLING_MS = 150;  // 80Hz時の初回安定時間 (データシート: 約100ms)
-const uint32_t SAMPLE_PERIOD_US = 1000000UL / HX711_SAMPLE_RATE_HZ;  // 12500us
+const uint8_t DT_PIN[4] = {
+  D0,
+  D2,
+  D4,
+  D6
+};
 
-// ゼロ点キャリブレーション設定
-const uint16_t CALIB_WARMUP_SAMPLES = 80;   // 起動直後の不安定分を捨てる (約1秒)
-const uint16_t CALIB_SAMPLES = 120;         // メジアン用に取得する数 (約1.5秒)
+const uint8_t CLK_PIN[4] = {
+  D1,
+  D3,
+  D5,
+  D7
+};
 
-// SC616C 500g
-#define OUT_VOL 0.0007f
-#define LOAD 500.0f
+const uint16_t HX711_SETTLING_MS = 150;
+const uint32_t HX711_READY_TIMEOUT_US = 30000;
 
-float offset[4];
+//--------------------------------------------------
+// 4台すべてが変換完了するまで待つ
+//--------------------------------------------------
+bool waitAllHX711Ready(
+  uint32_t timeoutUs = HX711_READY_TIMEOUT_US
+)
+{
+  const uint32_t startUs = micros();
 
-//---------------------------------
-// HX711読み取り
-//---------------------------------
-long readHX711(uint8_t ch) {
-  long data = 0;
+  while (
+    digitalRead(DT_PIN[0]) == HIGH ||
+    digitalRead(DT_PIN[1]) == HIGH ||
+    digitalRead(DT_PIN[2]) == HIGH ||
+    digitalRead(DT_PIN[3]) == HIGH
+  )
+  {
+    if ((uint32_t)(micros() - startUs) >= timeoutUs)
+    {
+      return false;
+    }
 
-  for (int i = 0; i < 24; i++) {
+    yield();
+  }
+
+  return true;
+}
+
+//--------------------------------------------------
+// HX711を1台読み取る
+//--------------------------------------------------
+int32_t readHX711Raw(uint8_t ch)
+{
+  uint32_t data = 0;
+
+  // PD_SCKのHIGH期間が割り込みで長くなるのを防ぐ
+  noInterrupts();
+
+  for (uint8_t bit = 0; bit < 24; bit++)
+  {
     digitalWrite(CLK_PIN[ch], HIGH);
     delayMicroseconds(1);
 
     data <<= 1;
 
-    if (digitalRead(DT_PIN[ch]))
-      data++;
+    if (digitalRead(DT_PIN[ch]) == HIGH)
+    {
+      data |= 1UL;
+    }
 
     digitalWrite(CLK_PIN[ch], LOW);
     delayMicroseconds(1);
   }
 
-  // Gain = 128
+  // 25パルス目
+  // 次回変換をChannel A / Gain 128に設定
   digitalWrite(CLK_PIN[ch], HIGH);
   delayMicroseconds(1);
+
   digitalWrite(CLK_PIN[ch], LOW);
+  delayMicroseconds(1);
 
-  return data ^ 0x800000;
-}
+  interrupts();
 
-//---------------------------------
-float rawToGram(long raw) {
-  const float AVDD = 4.2987f;
-  const float ADC1bit = AVDD / 16777216.0f;
-  const float SCALE = OUT_VOL * AVDD / LOAD * 128.0f;
-
-  return raw * ADC1bit / SCALE;
-}
-
-//---------------------------------
-// 配列のメジアンを求める (挿入ソート後に中央値)
-//---------------------------------
-float median(float *v, int n) {
-  for (int i = 1; i < n; i++) {
-    float key = v[i];
-    int j = i - 1;
-    while (j >= 0 && v[j] > key) {
-      v[j + 1] = v[j];
-      j--;
-    }
-    v[j + 1] = key;
+  // HX711の24bit符号付き値を32bitへ符号拡張
+  if (data & 0x800000UL)
+  {
+    data |= 0xFF000000UL;
   }
 
-  if (n & 1)
-    return v[n / 2];
-  return (v[n / 2 - 1] + v[n / 2]) * 0.5f;
+  return (int32_t)data;
 }
 
-//---------------------------------
-// 全CHのDTがLOWになるまで待つ (変換完了)
-//---------------------------------
-void waitHX711Ready() {
-  while (digitalRead(DT_PIN[0]) || digitalRead(DT_PIN[1]) ||
-         digitalRead(DT_PIN[2]) || digitalRead(DT_PIN[3]))
-    ;
+//--------------------------------------------------
+// 4台を順番に読み取る
+//--------------------------------------------------
+bool readAllHX711Raw(int32_t raw[4])
+{
+  if (!waitAllHX711Ready())
+  {
+    return false;
+  }
+
+  for (uint8_t ch = 0; ch < 4; ch++)
+  {
+    raw[ch] = readHX711Raw(ch);
+  }
+
+  return true;
 }
 
-//---------------------------------
-void setup() {
+//--------------------------------------------------
+void setup()
+{
   Serial.begin(115200);
 
-  for (int i = 0; i < 4; i++) {
-    pinMode(DT_PIN[i], INPUT);
-    pinMode(CLK_PIN[i], OUTPUT);
-    digitalWrite(CLK_PIN[i], LOW);
+  for (uint8_t ch = 0; ch < 4; ch++)
+  {
+    pinMode(DT_PIN[ch], INPUT);
+    pinMode(CLK_PIN[ch], OUTPUT);
+
+    digitalWrite(CLK_PIN[ch], LOW);
   }
 
   delay(HX711_SETTLING_MS);
-
-  //-----------------------------
-  // ゼロ点キャリブレーション
-  //  1) 起動直後の不安定分を読み捨てる
-  //  2) 約1.5秒取得し、CHごとにメジアンで0点を決める
-  //-----------------------------
-
-  // 1) ウォームアップ (読み捨て)
-  for (int n = 0; n < CALIB_WARMUP_SAMPLES; n++) {
-    waitHX711Ready();
-    for (int i = 0; i < 4; i++)
-      readHX711(i);
-  }
-
-  // 2) サンプル収集
-  static float buf[4][CALIB_SAMPLES];
-
-  for (int n = 0; n < CALIB_SAMPLES; n++) {
-    waitHX711Ready();
-    for (int i = 0; i < 4; i++)
-      buf[i][n] = rawToGram(readHX711(i));
-  }
-
-  // 3) CHごとのメジアンをゼロ点に
-  for (int i = 0; i < 4; i++)
-    offset[i] = median(buf[i], CALIB_SAMPLES);
-
-  // ここでは何も出力しない
 }
 
-//---------------------------------
-void loop() {
-  static uint32_t next_sample_us = 0;
+//--------------------------------------------------
+void loop()
+{
+  int32_t raw[4];
 
-  // 80Hz周期に合わせて次サンプル時刻まで待機
-  if (next_sample_us != 0) {
-    while ((int32_t)(micros() - next_sample_us) < 0)
-      ;
+  if (!readAllHX711Raw(raw))
+  {
+    return;
   }
 
-  waitHX711Ready();
+  Serial.print(raw[0]);
+  Serial.print(',');
 
-  float g[4];
+  Serial.print(raw[1]);
+  Serial.print(',');
 
-  for (int i = 0; i < 4; i++)
-    g[i] = rawToGram(readHX711(i)) - offset[i];
+  Serial.print(raw[2]);
+  Serial.print(',');
 
-  next_sample_us = micros() + SAMPLE_PERIOD_US;
-
-  // CSVのみ出力
-  Serial.print(g[0], 3);
-  Serial.print(",");
-  Serial.print(g[1], 3);
-  Serial.print(",");
-  Serial.print(g[2], 3);
-  Serial.print(",");
-  Serial.println(g[3], 3);
+  Serial.println(raw[3]);
 }
