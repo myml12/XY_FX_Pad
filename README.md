@@ -47,6 +47,8 @@ X軸とY軸には独立したエフェクトを割り当てる。パッドを押
 - `Sweep Calligraphy` / `Echo Script`: 書く位置そのものを音色・残響の動きにする。
 - `Bass Stroke` / `Bright Stroke` / `Air Brush`: 太さ、明るさ、空間のキャラクターを変える演出用。
 
+SDVX風の演出には、`SDVX Laser Wobble`、`SDVX FX Gate`、`SDVX Retrigger`、`SDVX Jet Flanger`、`SDVX Noisy Filter`、`SDVX Live Reverb` も用意しています。左右の筆運びをゲームの2つのつまみ、筆圧をFXボタン長押しとして扱う、プレイ感を重視した再構成です。
+
 実演時は、単発の強い誤タッチを避けるため、Bridgeのゼロ点校正をパッド無荷重で終えてから開始してください。UDPが200ms途切れた場合は自動でFXが解除されます。
 
 DSP、BPM解析、音声ルーティングの詳細: [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md)

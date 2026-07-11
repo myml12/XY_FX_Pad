@@ -380,6 +380,13 @@ void MainComponent::setupComboBoxes()
     performancePresetBox.addItem ("Bass Stroke", 9);
     performancePresetBox.addItem ("Bright Stroke", 10);
     performancePresetBox.addItem ("Air Brush", 11);
+    performancePresetBox.addSeparator();
+    performancePresetBox.addItem ("SDVX Laser Wobble", 12);
+    performancePresetBox.addItem ("SDVX FX Gate", 13);
+    performancePresetBox.addItem ("SDVX Retrigger", 14);
+    performancePresetBox.addItem ("SDVX Jet Flanger", 15);
+    performancePresetBox.addItem ("SDVX Noisy Filter", 16);
+    performancePresetBox.addItem ("SDVX Live Reverb", 17);
     performancePresetBox.setSelectedId (2, juce::dontSendNotification);
 
     xEffectBox.onChange = [this]
@@ -464,6 +471,26 @@ void MainComponent::applyPerformancePreset (int presetId)
             break;
         case 11: // 大きな筆運び向けの広がり。空間系を重ねる実験用。
             preset = { EffectType::chorus, EffectType::autoPan, EffectType::reverb };
+            break;
+        // 以下はSDVXの操作感を既存DSPで再構成したプリセット。
+        // 厳密なゲーム内DSPの複製ではなく、左右のつまみ=X/Y、FXボタン=筆圧という対応。
+        case 12:
+            preset = { EffectType::filter, EffectType::ladder, EffectType::off };
+            break;
+        case 13:
+            preset = { EffectType::filter, EffectType::off, EffectType::gate };
+            break;
+        case 14:
+            preset = { EffectType::filter, EffectType::off, EffectType::roll };
+            break;
+        case 15:
+            preset = { EffectType::flanger, EffectType::phaser, EffectType::off };
+            break;
+        case 16:
+            preset = { EffectType::bandPass, EffectType::highPass, EffectType::bitCrusher };
+            break;
+        case 17:
+            preset = { EffectType::filter, EffectType::off, EffectType::reverb };
             break;
         default:
             return;

@@ -63,6 +63,19 @@ XY_FX_Pad は、JUCEのリアルタイム音声処理と、外部物理コント
 | `Bright Stroke` | High Shelf | Phaser | Gate | 明るい払いとリズミカルな止めを強調。 |
 | `Air Brush` | Chorus | Auto Pan | Reverb | 大きな筆運び用の広がりのある実験的な空間表現。 |
 
+### SDVX inspired presets
+
+SDVXのゲーム内DSPそのものを解析・複製したものではない。左右のアナログデバイスをX/Y、FXボタンの長押しを筆圧に対応させ、既存DSPでプレイ感を再構成したプリセットである。
+
+| プリセット | X（左つまみ） | Y（右つまみ） | Pressure（FXボタン） | 演出 |
+| --- | --- | --- | --- | --- |
+| `SDVX Laser Wobble` | Filter | Ladder | Off | 左右の軌跡でフィルターと共振を大きく動かすレーザー向け。 |
+| `SDVX FX Gate` | Filter | Off | Gate | つまみのフィルターを保ちつつ、筆圧でリズミカルなFXロングを作る。 |
+| `SDVX Retrigger` | Filter | Off | Roll | 強い点・止めをテンポ同期の短い繰り返しへ変える。 |
+| `SDVX Jet Flanger` | Flanger | Phaser | Off | 2つのつまみで金属的なジェット感を作る。 |
+| `SDVX Noisy Filter` | Band Pass | High Pass | BitCrusher | フィルターとローファイを重ねた荒い変化。 |
+| `SDVX Live Reverb` | Filter | Off | Reverb | つまみの音色変化に、FX長押しの空間的な広がりを足す。 |
+
 ## エフェクト設計
 
 各エフェクトは1軸の値を受け取り、音量・周波数・時間・wet量などへ変換します。端点で破綻しにくいよう、連続値には `smoothstep` 系のカーブを使い、テンポ同期系は段階値に量子化しています。
