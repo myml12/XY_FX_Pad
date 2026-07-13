@@ -1,6 +1,42 @@
 #include "MainComponent.h"
 #include "SystemAudioRouter.h"
 
+namespace
+{
+// Pressure Effectには位置軸がないため、各FXで音楽的に使いやすい主パラメータを
+// 固定する。筆圧は常に effect strength / wet / resonance などの「強さ」だけを動かす。
+float pressureEffectDefaultAmount (EffectType effect)
+{
+    switch (effect)
+    {
+        case EffectType::gate:       return 0.62f;
+        case EffectType::echo:       return 0.38f;
+        case EffectType::reverb:     return 0.55f;
+        case EffectType::filter:     return 0.30f;
+        case EffectType::lowPass:    return 0.30f;
+        case EffectType::highPass:   return 0.32f;
+        case EffectType::bandPass:   return 0.42f;
+        case EffectType::notch:      return 0.45f;
+        case EffectType::flanger:    return 0.42f;
+        case EffectType::phaser:     return 0.42f;
+        case EffectType::tremolo:    return 0.48f;
+        case EffectType::drive:      return 0.48f;
+        case EffectType::bitCrusher: return 0.55f;
+        case EffectType::roll:       return 0.28f;
+        case EffectType::chorus:     return 0.45f;
+        case EffectType::compressor: return 0.48f;
+        case EffectType::peakEq:     return 0.55f;
+        case EffectType::lowShelf:   return 0.62f;
+        case EffectType::highShelf:  return 0.62f;
+        case EffectType::ladder:     return 0.42f;
+        case EffectType::autoPan:    return 0.45f;
+        case EffectType::off:        return 0.0f;
+    }
+
+    return 0.5f;
+}
+}
+
 #include <cmath>
 
 MainComponent::MainComponent()
@@ -276,9 +312,10 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
         if (selectedYEffect != EffectType::off)
             yEffectProcessor.process (bufferToFill, selectedYEffect, y, bpm, pressure);
 
-        // 荷重専用エフェクト: amount=筆圧。強さパラメータはフルで渡す
+        // 荷重専用エフェクト: 主パラメータはFXごとの固定値、筆圧は常に強さ。
         if (selectedPressureEffect != EffectType::off)
-            pressureEffectProcessor.process (bufferToFill, selectedPressureEffect, pressure, bpm, 1.0f);
+            pressureEffectProcessor.process (bufferToFill, selectedPressureEffect,
+                                              pressureEffectDefaultAmount (selectedPressureEffect), bpm, pressure);
     }
 
     if (canCrossfade)
@@ -454,14 +491,14 @@ void MainComponent::setupComboBoxes()
     addEffects (xEffectBox);
     addEffects (yEffectBox);
     addEffects (pressureEffectBox);
-    xEffectBox.setSelectedId (static_cast<int> (EffectType::peakEq), juce::dontSendNotification);
-    yEffectBox.setSelectedId (static_cast<int> (EffectType::off), juce::dontSendNotification);
-    pressureEffectBox.setSelectedId (static_cast<int> (EffectType::off), juce::dontSendNotification);
+    xEffectBox.setSelectedId (static_cast<int> (EffectType::filter), juce::dontSendNotification);
+    yEffectBox.setSelectedId (static_cast<int> (EffectType::peakEq), juce::dontSendNotification);
+    pressureEffectBox.setSelectedId (static_cast<int> (EffectType::gate), juce::dontSendNotification);
 
     // ComboBox上ではASCIIだけを使う。環境依存フォントで長いダッシュ等が
     // 文字化けしないようにし、現場で確実に読める名前にする。
     performancePresetBox.addItem ("Custom", 1);
-    performancePresetBox.addItem ("Ink Accent", 2);
+    performancePresetBox.addItem ("Brush Peak Gate", 2);
     performancePresetBox.addItem ("Ink Bleed", 3);
     performancePresetBox.addItem ("Rhythm Strokes", 4);
     performancePresetBox.addItem ("Sweep Calligraphy", 5);
@@ -529,12 +566,12 @@ void MainComponent::applyPerformancePreset (int presetId)
         EffectType pressure;
     };
 
-    Preset preset { EffectType::peakEq, EffectType::off, EffectType::off };
+    Preset preset { EffectType::filter, EffectType::peakEq, EffectType::gate };
 
     switch (presetId)
     {
-        case 2: // 音程帯を筆圧で強調。文字の輪郭を邪魔しない基準プリセット。
-            preset = { EffectType::peakEq, EffectType::off, EffectType::off };
+        case 2: // Filter + Peak EQ + Gate。筆でなぞりつつ荷重でリズムゲート。
+            preset = { EffectType::filter, EffectType::peakEq, EffectType::gate };
             break;
         case 3: // 払いに合わせてフィルターを開き、荷重で残響を深くする。
             preset = { EffectType::ladder, EffectType::off, EffectType::reverb };
