@@ -2,6 +2,7 @@
 
 #include "ControllerReceiver.h"
 #include "Effects.h"
+#include "LedRingDisplay.h"
 #include "PressureMeter.h"
 #include "SpectrumDisplay.h"
 #include "Tempo.h"
@@ -60,6 +61,7 @@ private:
     static void softLimitOutput (const juce::AudioSourceChannelInfo& bufferToFill);
     static juce::String formatTime (double seconds);
 
+    LedRingDisplay ledRing;
     XYPad pad;
     PressureMeter pressureMeter;
     SpectrumDisplay spectrumDisplay;
@@ -67,6 +69,7 @@ private:
     juce::TextButton modeButton;
     juce::TextButton playButton;
     juce::TextButton nightcoreButton;
+    juce::TextButton ledVisualButton;
     juce::ComboBox fileBox;
     juce::ComboBox xEffectBox;
     juce::ComboBox yEffectBox;

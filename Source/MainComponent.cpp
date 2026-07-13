@@ -76,6 +76,7 @@ MainComponent::MainComponent()
         });
     };
 
+    addAndMakeVisible (ledRing);
     addAndMakeVisible (pad);
     addAndMakeVisible (pressureMeter);
     addAndMakeVisible (spectrumDisplay);
@@ -83,6 +84,7 @@ MainComponent::MainComponent()
     addAndMakeVisible (modeButton);
     addAndMakeVisible (playButton);
     addAndMakeVisible (nightcoreButton);
+    addAndMakeVisible (ledVisualButton);
     addAndMakeVisible (fileBox);
     addAndMakeVisible (xEffectBox);
     addAndMakeVisible (yEffectBox);
@@ -129,11 +131,20 @@ MainComponent::MainComponent()
     nightcoreButton.setButtonText ("Nightcore");
     nightcoreButton.onClick = [this] { toggleNightcore(); };
 
+    ledVisualButton.setButtonText ("LED Visual (Blue Pressure)");
+    ledVisualButton.setClickingTogglesState (true);
+    ledVisualButton.setToggleState (true, juce::dontSendNotification);
+    ledVisualButton.onClick = [this]
+    {
+        ledRing.setSimulationEnabled (ledVisualButton.getToggleState());
+    };
+
     setWantsKeyboardFocus (true);
     addKeyListener (this);
     modeButton.addKeyListener (this);
     playButton.addKeyListener (this);
     nightcoreButton.addKeyListener (this);
+    ledVisualButton.addKeyListener (this);
     fileBox.addKeyListener (this);
     xEffectBox.addKeyListener (this);
     yEffectBox.addKeyListener (this);
@@ -182,6 +193,7 @@ MainComponent::MainComponent()
     styleButton (modeButton, juce::Colour (0xffc6ef73));
     styleButton (playButton, juce::Colour (0xffc6ef73));
     styleButton (nightcoreButton, juce::Colour (0xffc6ef73));
+    styleButton (ledVisualButton, juce::Colour (0xff58aeff));
 
     const auto styleCombo = [] (juce::ComboBox& box)
     {
@@ -199,7 +211,7 @@ MainComponent::MainComponent()
     positionSlider.setColour (juce::Slider::thumbColourId, juce::Colour (0xffc6ef73));
 
     loadSelectedAudioFile();
-    setSize (760, 820);
+    setSize (760, 860);
     setAudioChannels (0, 2);
     // Track mode is the default: never open BlackHole or leave system output on it.
     applyTrackModeRouting();
@@ -222,6 +234,7 @@ MainComponent::~MainComponent()
     xEffectBox.removeKeyListener (this);
     fileBox.removeKeyListener (this);
     nightcoreButton.removeKeyListener (this);
+    ledVisualButton.removeKeyListener (this);
     playButton.removeKeyListener (this);
     modeButton.removeKeyListener (this);
     removeKeyListener (this);
@@ -380,7 +393,7 @@ void MainComponent::paint (juce::Graphics& g)
 
     auto content = getLocalBounds().reduced (18).toFloat();
     content.removeFromTop (52.0f);
-    auto controlsCard = content.removeFromTop (222.0f);
+    auto controlsCard = content.removeFromTop (260.0f);
     g.setColour (juce::Colour (0xff121416).withAlpha (0.96f));
     g.fillRoundedRectangle (controlsCard, 16.0f);
     g.setColour (juce::Colours::white.withAlpha (0.09f));
@@ -414,7 +427,7 @@ void MainComponent::resized()
     header.removeFromRight (12);
     title.setBounds (header);
 
-    auto controls = area.removeFromTop (214);
+    auto controls = area.removeFromTop (252);
     controls.reduce (12, 12);
     auto fileRow = controls.removeFromTop (32);
     bpmLabel.setBounds (fileRow.removeFromRight (110));
@@ -434,6 +447,9 @@ void MainComponent::resized()
     performancePresetBox.setBounds (controls.removeFromTop (32));
 
     controls.removeFromTop (12);
+    ledVisualButton.setBounds (controls.removeFromTop (32));
+
+    controls.removeFromTop (12);
     auto positionRow = controls.removeFromTop (30);
     positionLabel.setBounds (positionRow.removeFromRight (140));
     positionRow.removeFromRight (8);
@@ -448,6 +464,8 @@ void MainComponent::resized()
     pressureMeter.setBounds (padArea.removeFromRight (meterW + 14).withTrimmedLeft (10));
     const auto side = juce::jmin (padArea.getWidth(), padArea.getHeight() - 18);
     pad.setBounds (padArea.withSizeKeepingCentre (side, side));
+    ledRing.setBounds (pad.getBounds().expanded (12));
+    ledRing.toBack();
 }
 
 bool MainComponent::keyPressed (const juce::KeyPress& key, juce::Component*)
@@ -749,6 +767,8 @@ juce::Array<juce::File> MainComponent::getAudioDirectories() const
 void MainComponent::timerCallback()
 {
     updateControllerPadDisplay();
+    ledRing.setPerformanceState (audioPadX.load(), audioPadY.load(), audioPadPressure.load(),
+                                 audioEffectsActive.load());
 
     if (! useExternalInput.load() && readerSource != nullptr && shouldBePlaying.load() && ! transport.isPlaying())
         transport.start();

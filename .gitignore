@@ -13,6 +13,7 @@ Makefile
 *.xcodeproj/
 *.xcworkspace/
 *.app/
+.cache/
 
 # JUCE checkout
 JUCE/

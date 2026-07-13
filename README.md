@@ -12,6 +12,7 @@ X軸とY軸には独立したエフェクトを割り当てる。パッドを押
 - 再生位置表示、シーク、Play/Pause、スペースキー操作
 - BPM推定に基づく `Gate`, `Echo`, `Roll` のテンポ同期
 - 出力音の周波数帯域を常時表示するLive Spectrum
+- 実機LEDを接続する前に演出を確認できる、パッド外周のLED Visualシミュレーター
 - ピッチとテンポを同時に上げるNightcoreモード
 - ESP32-S3 + ロードセル + HX711による4点圧力コントローラー入力
 - シリアル処理を別プロセス化し、UDPでアプリへXY座標を送信
@@ -54,6 +55,7 @@ SDVX風の演出には、`SDVX Laser Wobble`、`SDVX FX Gate`、`SDVX Retrigger`
 
 DSP、BPM解析、音声ルーティングの詳細: [docs/TECHNICAL_SPEC.md](docs/TECHNICAL_SPEC.md)
 エフェクトごとの実際の音声処理と聴こえ方: [docs/EFFECTS.md](docs/EFFECTS.md)
+LED Visualの演出仕様と実機化の対応: [docs/LED_SIMULATION.md](docs/LED_SIMULATION.md)
 
 ## ハードウェア構成
 
