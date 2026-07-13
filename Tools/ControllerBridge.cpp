@@ -21,7 +21,8 @@ constexpr const char* defaultSerialPort = "/dev/cu.usbmodem1101";
 constexpr const char* udpHost = "127.0.0.1";
 constexpr int udpPort = 45454;
 constexpr float touchThresholdGrams = 5.0f;
-constexpr float padMargin = 0.10f;
+// 端の補正を控えめにして、位置変化が急に端へ吸い付く感覚を抑える。
+constexpr float padMargin = 0.05f;
 constexpr int channelCount = 4;
 
 // SC616C 500 g load cell / HX711 gain 128.

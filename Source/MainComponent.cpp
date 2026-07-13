@@ -899,7 +899,7 @@ void MainComponent::handleControllerSample (const ControllerSample& sample)
 {
     // タッチ閾値〜しっかり押した荷重を 0..1 の筆圧に正規化
     constexpr float pressureMinGrams = 2.0f;
-    constexpr float pressureMaxGrams = 15.0f;
+    constexpr float pressureMaxGrams = 20.0f;
     // 対数カーブ: 弱い押下側の変化を大きく取り、強い側はゆるやかに飽和
     constexpr float logStrength = 9.0f;
 
