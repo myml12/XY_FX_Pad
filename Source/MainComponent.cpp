@@ -1,6 +1,8 @@
 #include "MainComponent.h"
 #include "SystemAudioRouter.h"
 
+#include <cmath>
+
 MainComponent::MainComponent()
 {
     formatManager.registerBasicFormats();
@@ -829,11 +831,17 @@ void MainComponent::updateStatus()
 void MainComponent::handleControllerSample (const ControllerSample& sample)
 {
     // タッチ閾値〜しっかり押した荷重を 0..1 の筆圧に正規化
-    constexpr float pressureMinGrams = 5.0f;
-    constexpr float pressureMaxGrams = 90.0f;
-    const auto normalisedPressure = juce::jlimit (
+    constexpr float pressureMinGrams = 2.0f;
+    constexpr float pressureMaxGrams = 15.0f;
+    // 対数カーブ: 弱い押下側の変化を大きく取り、強い側はゆるやかに飽和
+    constexpr float logStrength = 9.0f;
+
+    const auto linear = juce::jlimit (
         0.0f, 1.0f,
         (sample.totalGrams - pressureMinGrams) / (pressureMaxGrams - pressureMinGrams));
+    const auto normalisedPressure = linear <= 0.0f
+                                        ? 0.0f
+                                        : std::log1p (linear * logStrength) / std::log1p (logStrength);
 
     audioPadX.store (sample.x);
     audioPadY.store (sample.y);
