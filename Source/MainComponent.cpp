@@ -78,6 +78,7 @@ MainComponent::MainComponent()
 
     addAndMakeVisible (pad);
     addAndMakeVisible (pressureMeter);
+    addAndMakeVisible (spectrumDisplay);
     addAndMakeVisible (title);
     addAndMakeVisible (modeButton);
     addAndMakeVisible (playButton);
@@ -322,6 +323,7 @@ void MainComponent::getNextAudioBlock (const juce::AudioSourceChannelInfo& buffe
         crossfadeEffectsWithDry (bufferToFill);
 
     softLimitOutput (bufferToFill);
+    spectrumDisplay.pushAudioBlock (bufferToFill);
 }
 
 void MainComponent::crossfadeEffectsWithDry (const juce::AudioSourceChannelInfo& bufferToFill)
@@ -385,6 +387,11 @@ void MainComponent::paint (juce::Graphics& g)
     g.drawRoundedRectangle (controlsCard, 16.0f, 1.0f);
 
     content.removeFromTop (10.0f);
+    auto spectrumCard = content.removeFromTop (98.0f);
+    g.setColour (juce::Colour (0xff101214).withAlpha (0.94f));
+    g.fillRoundedRectangle (spectrumCard, 14.0f);
+
+    content.removeFromTop (10.0f);
     auto padCard = content.withTrimmedBottom (42.0f);
     g.setColour (juce::Colour (0xff101214).withAlpha (0.94f));
     g.fillRoundedRectangle (padCard, 18.0f);
@@ -431,6 +438,9 @@ void MainComponent::resized()
     positionLabel.setBounds (positionRow.removeFromRight (140));
     positionRow.removeFromRight (8);
     positionSlider.setBounds (positionRow);
+    area.removeFromTop (10);
+    spectrumDisplay.setBounds (area.removeFromTop (92));
+    area.removeFromTop (12);
     status.setBounds (area.removeFromBottom (34));
 
     constexpr int meterW = 36;

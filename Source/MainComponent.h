@@ -3,6 +3,7 @@
 #include "ControllerReceiver.h"
 #include "Effects.h"
 #include "PressureMeter.h"
+#include "SpectrumDisplay.h"
 #include "Tempo.h"
 #include "XYPad.h"
 
@@ -61,6 +62,7 @@ private:
 
     XYPad pad;
     PressureMeter pressureMeter;
+    SpectrumDisplay spectrumDisplay;
     juce::Label title;
     juce::TextButton modeButton;
     juce::TextButton playButton;
