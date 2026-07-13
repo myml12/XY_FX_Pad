@@ -93,12 +93,12 @@ private:
     ControllerReceiver controllerReceiver { 45454 };
     TempoAnalysis tempoAnalysis;
 
-    EffectType xEffect = EffectType::peakEq;
-    EffectType yEffect = EffectType::off;
-    EffectType pressureEffect = EffectType::off;
-    std::atomic<int> audioXEffect { static_cast<int> (EffectType::peakEq) };
-    std::atomic<int> audioYEffect { static_cast<int> (EffectType::off) };
-    std::atomic<int> audioPressureEffect { static_cast<int> (EffectType::off) };
+    EffectType xEffect = EffectType::filter;
+    EffectType yEffect = EffectType::peakEq;
+    EffectType pressureEffect = EffectType::gate;
+    std::atomic<int> audioXEffect { static_cast<int> (EffectType::filter) };
+    std::atomic<int> audioYEffect { static_cast<int> (EffectType::peakEq) };
+    std::atomic<int> audioPressureEffect { static_cast<int> (EffectType::gate) };
     std::atomic<float> audioPadX { 0.5f };
     std::atomic<float> audioPadY { 0.0f };
     std::atomic<float> audioPadPressure { 0.0f };
